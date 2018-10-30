@@ -111,7 +111,7 @@ class directory:
       return True
 
   def __del__(self):
-    if os.close and self._fd is not None:
+    if os and os.close and self._fd is not None:
       os.close(self._fd)
 
 @contextlib.contextmanager
