@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, sys
+import contextlib
 from . import abc, _io
 
 class RecordLog(abc.Log):
@@ -56,7 +56,7 @@ class RecordLog(abc.Log):
       if len(self._messages) == n:
         self._messages.pop() # remove empty context
       else:
-        self._messages.append(('context_exit',) + sys.exc_info())
+        self._messages.append(('context_exit',))
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
@@ -74,7 +74,7 @@ class RecordLog(abc.Log):
         if id:
           self._seen[id] = data
     finally:
-      self._messages.append(('open_exit', data) + sys.exc_info())
+      self._messages.append(('open_exit', data))
 
   def write(self, text, level):
     self._messages.append(('write', text, level))
@@ -95,7 +95,7 @@ class RecordLog(abc.Log):
         contexts.append(ctx)
       elif cmd == 'context_exit':
         ctx = contexts.pop()
-        ctx.__exit__(*args)
+        ctx.__exit__(None, None, None)
       elif cmd == 'open_enter':
         ctx = log.open(*args)
         contexts.append((ctx, ctx.__enter__()))
@@ -103,7 +103,7 @@ class RecordLog(abc.Log):
         ctx, f = contexts.pop()
         if args[0] is not None:
           f.write(args[0])
-        ctx.__exit__(*args[1:])
+        ctx.__exit__(None, None, None)
       elif cmd == 'write':
         log.write(*args)
 

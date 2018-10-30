@@ -293,28 +293,28 @@ class RecordLog(Log):
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
       ('open_enter', 'test.dat', 'wb', 1, None),
-      ('open_exit', b'test1', None, None, None),
+      ('open_exit', b'test1'),
       ('context_enter', 'my context'),
       ('context_enter', 'iter 0 (17%)'),
       ('write', 'a', 1),
-      ('context_exit', None, None, None),
+      ('context_exit',),
       ('context_enter', 'iter 1 (50%)'),
       ('write', 'b', 1),
-      ('context_exit', None, None, None),
+      ('context_exit',),
       ('context_enter', 'iter 2 (83%)'),
       ('write', 'c', 1),
-      ('context_exit', None, None, None),
+      ('context_exit',),
       ('write', 'multiple..\n  ..lines', 4),
       ('open_enter', 'test.dat', 'wb+', 2, None),
       ('write', 'generating', 1),
-      ('open_exit', b'test2', None, None, None),
-      ('context_exit', None, None, None),
+      ('open_exit', b'test2'),
+      ('context_exit',),
       ('context_enter', 'generate_id'),
       ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3', None, None, None),
-      ('context_exit', None, None, None),
+      ('open_exit', b'test3'),
+      ('context_exit',),
       ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3', None, None, None)])
+      ('open_exit', b'test3')])
     for Log in StdoutLog, RichOutputLog, DataLog, HtmlLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
@@ -390,14 +390,14 @@ class FilterLog(Log):
       ('context_enter', 'my context'),
       ('write', 'multiple..\n  ..lines', 4),
       ('open_enter', 'test.dat', 'wb+', 2, None),
-      ('open_exit', b'test2', None, None, None),
-      ('context_exit', None, None, None),
+      ('open_exit', b'test2'),
+      ('context_exit',),
       ('context_enter', 'generate_id'),
       ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3', None, None, None),
-      ('context_exit', None, None, None),
+      ('open_exit', b'test3'),
+      ('context_exit',),
       ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3', None, None, None)])
+      ('open_exit', b'test3')])
 
 class LoggingLog(Log):
 
