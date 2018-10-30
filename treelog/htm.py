@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, sys, itertools, os, urllib.parse, html, hashlib
+import contextlib, sys, os, urllib.parse, html, hashlib
 from . import abc, _io
 
 class HtmlLog(abc.Log, abc.Closing):
@@ -26,8 +26,7 @@ class HtmlLog(abc.Log, abc.Closing):
 
   def __init__(self, dirpath, *, filename='log.html', title=None):
     self._dir = _io.directory(dirpath)
-    for i in itertools.count():
-      self.filename = filename if not i else '-{}'.format(i).join(os.path.splitext(filename))
+    for self.filename in _io.sequence(filename):
       self._file = self._dir.open(self.filename, 'w')
       if self._file:
         break

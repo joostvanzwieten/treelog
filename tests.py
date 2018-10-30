@@ -142,15 +142,15 @@ class DataLog(Log):
   def output_tester(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       yield treelog.DataLog(tmpdir)
-      self.assertEqual(set(os.listdir(tmpdir)), {'test-1.dat', 'test-2.dat', 'test-3.dat', 'same-1', '.id'})
+      self.assertEqual(set(os.listdir(tmpdir)), {'test.dat', 'test-1.dat', 'test-2.dat', 'same', '.id'})
       self.assertEqual(os.listdir(os.path.join(tmpdir, '.id')), ['616263'])
-      with open(os.path.join(tmpdir, 'test-1.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test1')
-      with open(os.path.join(tmpdir, 'test-2.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-1.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test2')
-      with open(os.path.join(tmpdir, 'test-3.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-2.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
-      with open(os.path.join(tmpdir, 'same-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'same'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
       with open(os.path.join(tmpdir, '.id', '616263'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
@@ -165,7 +165,7 @@ class DataLog(Log):
       os.mkdir(outdira)
       with log.infofile('dat', 'wb') as f:
         pass
-      self.assertEqual(os.listdir(outdirb), ['dat-1'])
+      self.assertEqual(os.listdir(outdirb), ['dat'])
       self.assertEqual(os.listdir(outdira), [])
 
   def test_remove_on_failure(self):
@@ -345,7 +345,7 @@ class TeeLog(Log):
       with silent, teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_file_devnull(self):
@@ -354,7 +354,7 @@ class TeeLog(Log):
       with silent, teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_file_file(self):
@@ -363,9 +363,9 @@ class TeeLog(Log):
       with teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
-      with open(os.path.join(tmpdir, 'test-2'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_seekable_file(self):
@@ -376,7 +376,7 @@ class TeeLog(Log):
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
       self.assertEqual(recordlog._seen[b'abc'], b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
 class FilterLog(Log):

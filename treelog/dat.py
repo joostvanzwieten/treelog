@@ -18,16 +18,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import os, contextlib, functools, itertools
+import os, contextlib, functools
 from . import abc, _io
 
 class DataLog(abc.Log):
   '''Output only data.'''
 
-  def names(insert='-{}', start=1):
-    return lambda name: map(insert.join(os.path.splitext(name.replace('{','{{').replace('}','}}'))).format, itertools.count(start))
-
-  def __init__(self, dirpath=os.curdir, names=names()):
+  def __init__(self, dirpath=os.curdir, names=_io.sequence):
     self._names = functools.lru_cache(maxsize=32)(names)
     self._dir = _io.directory(dirpath)
 
