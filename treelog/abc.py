@@ -98,12 +98,19 @@ class Log(abc.ABC):
         length = len(iterable)
       except:
         pass
-    for i, val in enumerate(iterable):
+    iterator = iter(iterable)
+    i = 0
+    while True:
       text = '{} {}'.format(title, i)
       if length:
         text += ' ({:.0f}%)'.format(100 * (i+.5) / length)
       with self.context(text):
+        try:
+          val = next(iterator)
+        except StopIteration:
+          return
         yield val
+        i += 1
 
   def _factory(level):
 
