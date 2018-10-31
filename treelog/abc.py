@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import abc, functools, warnings
+import abc, functools, warnings, contextlib
 from . import _io
 
 class Closing(abc.ABC):
@@ -80,7 +80,11 @@ class Log(abc.ABC):
   method that returns a file context.'''
 
   @abc.abstractmethod
-  def context(self, title):
+  def pushcontext(self, title):
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def popcontext(self):
     raise NotImplementedError
 
   @abc.abstractmethod
@@ -90,6 +94,14 @@ class Log(abc.ABC):
   @abc.abstractmethod
   def open(self, filename, mode, level, id):
     raise NotImplementedError
+
+  @contextlib.contextmanager
+  def context(self, text):
+    self.pushcontext(text)
+    try:
+      yield
+    finally:
+      self.popcontext()
 
   @ClosingGenerator.compose
   def iter(self, title, iterable, length=None):
@@ -104,13 +116,16 @@ class Log(abc.ABC):
       text = '{} {}'.format(title, i)
       if length:
         text += ' ({:.0f}%)'.format(100 * (i+.5) / length)
-      with self.context(text):
-        try:
-          val = next(iterator)
-        except StopIteration:
-          return
+      self.pushcontext(text)
+      try:
+        val = next(iterator)
+      except StopIteration:
+        return
+      else:
         yield val
-        i += 1
+      finally:
+        self.popcontext()
+      i += 1
 
   def _factory(level):
 

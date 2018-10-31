@@ -50,9 +50,11 @@ class DataLog(abc.Log):
     if id is None:
       self._dir.unlink(fname)
 
-  @contextlib.contextmanager
-  def context(self, title):
-    yield
+  def pushcontext(self, title):
+    pass
+
+  def popcontext(self):
+    pass
 
   def write(self, text, level):
     pass

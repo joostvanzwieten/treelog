@@ -35,16 +35,11 @@ class ContextLog(abc.Log):
   def __init__(self):
     self._context = []
 
-  @contextlib.contextmanager
-  def context(self, title):
-    try:
-      depth = len(self._context)
-      self._context.append(title)
-      yield
-    finally:
-      self._context.pop()
-      if len(self._context) != depth:
-        self.warning('context ended out of order')
+  def pushcontext(self, title):
+    self._context.append(title)
+
+  def popcontext(self):
+    self._context.pop()
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
@@ -82,18 +77,17 @@ class RichOutputLog(ContextLog):
     if self._sleep.locked():
       self._sleep.release()
 
-  @contextlib.contextmanager
-  def context(self, title):
-    try:
-      with super().context(title):
-        if not self._state[1]:
-          self._state[1] = True
-          self._wakeup_thread() # start countdown
-        yield
-    finally:
-      if not self._state[1]:
-        self._state[1] = True
-        self._wakeup_thread() # start countdown
+  def pushcontext(self, title):
+    super().pushcontext(title)
+    if not self._state[1]:
+      self._state[1] = True
+      self._wakeup_thread() # start countdown
+
+  def popcontext(self):
+    super().popcontext()
+    if not self._state[1]:
+      self._state[1] = True
+      self._wakeup_thread() # start countdown
 
   def write(self, text, level):
     line = '\033[K' # clear line

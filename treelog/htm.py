@@ -42,19 +42,14 @@ class HtmlLog(abc.Log, abc.Closing):
     self._html_depth = 0 # number of currently open html elements nested under the "log" div
     self._context = []
 
-  @contextlib.contextmanager
-  def context(self, title):
-    try:
-      depth = len(self._context)
-      self._context.append(title)
-      yield
-    finally:
-      if self._html_depth == len(self._context):
-        print('</div><div class="end"></div></div>', file=self._file)
-        self._html_depth -= 1
-      self._context.pop()
-      if len(self._context) != depth:
-        self.warning('context ended out of order')
+  def pushcontext(self, title):
+    self._context.append(title)
+
+  def popcontext(self):
+    if self._html_depth == len(self._context):
+      print('</div><div class="end"></div></div>', file=self._file)
+      self._html_depth -= 1
+    self._context.pop()
 
   def write(self, text, level, escape=True):
     for c in self._context[self._html_depth:]:

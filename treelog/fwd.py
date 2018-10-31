@@ -28,10 +28,13 @@ class TeeLog(abc.Log):
     self._baselog1 = baselog1
     self._baselog2 = baselog2
 
-  @contextlib.contextmanager
-  def context(self, title):
-    with self._baselog1.context(title), self._baselog2.context(title):
-      yield
+  def pushcontext(self, title):
+    self._baselog1.pushcontext(title)
+    self._baselog2.pushcontext(title)
+
+  def popcontext(self):
+    self._baselog1.popcontext()
+    self._baselog2.popcontext()
 
   def write(self, text, level):
     self._baselog1.write(text, level)
@@ -67,8 +70,11 @@ class FilterLog(abc.Log):
     self._baselog = baselog
     self._minlevel = minlevel
 
-  def context(self, title):
-    return self._baselog.context(title)
+  def pushcontext(self, title):
+    return self._baselog.pushcontext(title)
+
+  def popcontext(self):
+    return self._baselog.popcontext()
 
   def write(self, text, level):
     if level >= self._minlevel:

@@ -46,17 +46,14 @@ class RecordLog(abc.Log):
     self._messages = []
     self._seen = {}
 
-  @contextlib.contextmanager
-  def context(self, title):
+  def pushcontext(self, title):
     self._messages.append(('context_enter', title))
-    n = len(self._messages)
-    try:
-      yield
-    finally:
-      if len(self._messages) == n:
-        self._messages.pop() # remove empty context
-      else:
-        self._messages.append(('context_exit',))
+
+  def popcontext(self):
+    if self._messages and self._messages[-1][0] == 'context_enter':
+      self._messages.pop()
+    else:
+      self._messages.append(('context_exit',))
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
