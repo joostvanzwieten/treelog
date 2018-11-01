@@ -60,34 +60,33 @@ class RichOutputLog(ContextLog):
     import _thread
     super().__init__()
     self._sleep = _thread.allocate_lock() # to be acquired by thread, released by self
-    self._state = [False, False] # mutable shared state: [killed, timing]
+    self._state = [True, True] # mutable shared state: [alive, asleep]
     _thread.start_new_thread(self._context_thread, (self._context, self._sleep, self._state, interval))
 
   @staticmethod
   def _context_thread(context, sleep, state, interval): # pragma: no cover (tested via stdout)
     try:
-      while not state[0]: # object is alive
-        if not sleep.acquire(timeout=interval if state[1] else -1): # timed out
+      while state[0]: # alive
+        if not sleep.acquire(timeout=-1 if state[1] else interval): # timed out
           sys.stdout.write('\033[K\033[1;30m' + ' · '.join(context) + '\033[0m\r' if context else '\033[K\r')
-          state[1] = False # sleep until further notice
+          state[1] = True # asleep
     except Exception as e:
       sys.stdout.write('\033[Kcontext thread died unexpectedly: {}\n'.format(e))
 
-  def _wakeup_thread(self):
+  def _trigger_thread(self):
+    self._state[1] = False # awake
     if self._sleep.locked():
       self._sleep.release()
 
   def pushcontext(self, title):
     super().pushcontext(title)
-    if not self._state[1]:
-      self._state[1] = True
-      self._wakeup_thread() # start countdown
+    if self._state[1]: # asleep
+      self._trigger_thread()
 
   def popcontext(self):
     super().popcontext()
-    if not self._state[1]:
-      self._state[1] = True
-      self._wakeup_thread() # start countdown
+    if self._state[1]: # asleep
+      self._trigger_thread()
 
   def write(self, text, level):
     line = '\033[K' # clear line
@@ -104,13 +103,12 @@ class RichOutputLog(ContextLog):
     line += text
     line += '\033[0m\n' # reset and newline
     sys.stdout.write(line)
-    self._wakeup_thread() # start/restart countdown
+    self._trigger_thread()
 
   def __del__(self):
     if hasattr(self, '_state'):
-      self._state[0] = True # order matters: first signal that the thread should stop
-      self._state[1] = True # then make sure that it doesn't accidentally fall asleep
-      self._wakeup_thread()
+      self._state[0] = False # signal that the thread should stop
+      self._trigger_thread()
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
