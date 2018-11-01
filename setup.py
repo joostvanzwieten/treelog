@@ -10,6 +10,8 @@ setup(
   description = 'Logging framework that organizes messages in a tree structure',
   author = 'Evalf',
   author_email = 'info@evalf.com',
+  url = 'https://github.com/evalf/treelog',
+  packages = ['treelog'],
   license = 'MIT',
   python_requires = '>=3.5',
 )
