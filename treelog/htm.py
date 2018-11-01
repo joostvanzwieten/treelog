@@ -21,7 +21,7 @@
 import contextlib, sys, os, urllib.parse, html, hashlib
 from . import abc, _io
 
-class HtmlLog(abc.Log, abc.Closing):
+class HtmlLog(abc.Log):
   '''Output html nested lists.'''
 
   def __init__(self, dirpath, *, filename='log.html', title=None):
@@ -88,6 +88,16 @@ class HtmlLog(abc.Log, abc.Closing):
       self._file.write(HTMLFOOT)
       self._file.close()
       return True
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args):
+    self.close()
+
+  def __del__(self):
+    if self.close():
+      warnings.warn('unclosed object {!r}'.format(self), ResourceWarning)
 
 HTMLHEAD = '''\
 <!DOCTYPE html>

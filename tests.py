@@ -39,8 +39,9 @@ class Log(unittest.TestCase):
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
     with treelog.context('my context'):
-      for i in treelog.iter('iter', 'abc'):
-        treelog.info(i)
+      for i, c in enumerate('abc'):
+        with treelog.context('iter', i):
+          treelog.info(c)
       with treelog.context('empty'):
         pass
       treelog.error('multiple..\n  ..lines')
@@ -64,38 +65,15 @@ class StdoutLog(Log):
     self.assertEqual(''.join(writes),
       'my message\n'
       'test.dat\n'
-      'my context > iter 0 (17%) > a\n'
-      'my context > iter 1 (50%) > b\n'
-      'my context > iter 2 (83%) > c\n'
+      'my context > iter 0 > a\n'
+      'my context > iter 1 > b\n'
+      'my context > iter 2 > c\n'
       'my context > multiple..\n'
       '  ..lines\n'
       'my context > test.dat > generating\n'
       'my context > test.dat\n'
       'generate_id > test.dat\n'
       'same\n')
-
-  def test_iter_warn(self):
-    log = treelog.StdoutLog()
-    with self.assertWarns(ResourceWarning):
-      for i in log.iter('range', range(9)):
-        if i == 2:
-          break
-
-  def test_iter_close(self):
-    log = treelog.StdoutLog()
-    r = log.iter('range', range(9))
-    for i in r:
-      if i == 2:
-        r.close()
-    self.assertEqual(i, 2)
-
-  def test_iter_context(self):
-    log = treelog.StdoutLog()
-    with log.iter('range', range(9)) as r:
-      for i in r:
-        if i == 2:
-          break
-    self.assertFalse(r.close())
 
 class RichOutputLog(Log):
 
@@ -106,9 +84,9 @@ class RichOutputLog(Log):
     self.assertEqual(writes, [
       '\x1b[K\x1b[1;34mmy message\x1b[0m\n',
       '\x1b[Ktest.dat\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 0 (17%) · \x1b[0ma\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 1 (50%) · \x1b[0mb\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 2 (83%) · \x1b[0mc\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 0 · \x1b[0ma\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 1 · \x1b[0mb\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 2 · \x1b[0mc\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;31mmultiple..\n  ..lines\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · test.dat · \x1b[0mgenerating\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;34mtest.dat\x1b[0m\n',
@@ -226,13 +204,13 @@ class HtmlLog(Log):
         '<div class="item" data-loglevel="2">my message</div>\n',
         '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
-        '<div class="context"><div class="title">iter 0 (17%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 0</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 1 (50%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
         '<div class="item" data-loglevel="1">b</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 2 (83%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
         '<div class="item" data-loglevel="1">c</div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4">multiple..\n',
@@ -295,13 +273,13 @@ class RecordLog(Log):
       ('open', 0, 'test.dat', 'wb', 1, None),
       ('close', 0, b'test1'),
       ('pushcontext', 'my context'),
-      ('pushcontext', 'iter 0 (17%)'),
+      ('pushcontext', 'iter 0'),
       ('write', 'a', 1),
       ('popcontext',),
-      ('pushcontext', 'iter 1 (50%)'),
+      ('pushcontext', 'iter 1'),
       ('write', 'b', 1),
       ('popcontext',),
-      ('pushcontext', 'iter 2 (83%)'),
+      ('pushcontext', 'iter 2'),
       ('write', 'c', 1),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
@@ -408,9 +386,9 @@ class LoggingLog(Log):
     self.assertEqual(cm.output, [
       'Level 25:nutils:my message',
       'INFO:nutils:test.dat',
-      'INFO:nutils:my context > iter 0 (17%) > a',
-      'INFO:nutils:my context > iter 1 (50%) > b',
-      'INFO:nutils:my context > iter 2 (83%) > c',
+      'INFO:nutils:my context > iter 0 > a',
+      'INFO:nutils:my context > iter 1 > b',
+      'INFO:nutils:my context > iter 2 > c',
       'ERROR:nutils:my context > multiple..\n  ..lines',
       'INFO:nutils:my context > test.dat > generating',
       'Level 25:nutils:my context > test.dat',
