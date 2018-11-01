@@ -292,29 +292,29 @@ class RecordLog(Log):
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('open_enter', 'test.dat', 'wb', 1, None),
-      ('open_exit', b'test1'),
-      ('context_enter', 'my context'),
-      ('context_enter', 'iter 0 (17%)'),
+      ('open', 0, 'test.dat', 'wb', 1, None),
+      ('close', 0, b'test1'),
+      ('pushcontext', 'my context'),
+      ('pushcontext', 'iter 0 (17%)'),
       ('write', 'a', 1),
-      ('context_exit',),
-      ('context_enter', 'iter 1 (50%)'),
+      ('popcontext',),
+      ('pushcontext', 'iter 1 (50%)'),
       ('write', 'b', 1),
-      ('context_exit',),
-      ('context_enter', 'iter 2 (83%)'),
+      ('popcontext',),
+      ('pushcontext', 'iter 2 (83%)'),
       ('write', 'c', 1),
-      ('context_exit',),
+      ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open_enter', 'test.dat', 'wb+', 2, None),
+      ('open', 1, 'test.dat', 'wb+', 2, None),
       ('write', 'generating', 1),
-      ('open_exit', b'test2'),
-      ('context_exit',),
-      ('context_enter', 'generate_id'),
-      ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3'),
-      ('context_exit',),
-      ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3')])
+      ('close', 1, b'test2'),
+      ('popcontext',),
+      ('pushcontext', 'generate_id'),
+      ('open', 2, 'test.dat', 'wb', 3, b'abc'),
+      ('close', 2, b'test3'),
+      ('popcontext',),
+      ('open', 3, 'same', 'wb', 4, b'abc'),
+      ('close', 3, b'test3')])
     for Log in StdoutLog, RichOutputLog, DataLog, HtmlLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
@@ -387,17 +387,17 @@ class FilterLog(Log):
     yield treelog.FilterLog(recordlog, minlevel=2)
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('context_enter', 'my context'),
+      ('pushcontext', 'my context'),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open_enter', 'test.dat', 'wb+', 2, None),
-      ('open_exit', b'test2'),
-      ('context_exit',),
-      ('context_enter', 'generate_id'),
-      ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3'),
-      ('context_exit',),
-      ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3')])
+      ('open', 0, 'test.dat', 'wb+', 2, None),
+      ('close', 0, b'test2'),
+      ('popcontext',),
+      ('pushcontext', 'generate_id'),
+      ('open', 1, 'test.dat', 'wb', 3, b'abc'),
+      ('close', 1, b'test3'),
+      ('popcontext',),
+      ('open', 2, 'same', 'wb', 4, b'abc'),
+      ('close', 2, b'test3')])
 
 class LoggingLog(Log):
 
