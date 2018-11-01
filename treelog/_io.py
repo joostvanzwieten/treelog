@@ -111,7 +111,7 @@ class directory:
       return True
 
   def __del__(self):
-    if os.close and self._fd is not None:
+    if os and os.close and self._fd is not None:
       os.close(self._fd)
 
 @contextlib.contextmanager
@@ -152,5 +152,15 @@ class devnull(io.IOBase):
 
   def seek(self, *args):
     return 0
+
+def sequence(filename):
+  '''Generate file names a.b, a-1.b, a-2.b, etc.'''
+
+  yield filename
+  splitext = os.path.splitext(filename)
+  i = 1
+  while True:
+    yield '-{}'.format(i).join(splitext)
+    i += 1
 
 # vim:sw=2:sts=2:et

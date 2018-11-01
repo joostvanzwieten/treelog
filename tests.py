@@ -39,8 +39,9 @@ class Log(unittest.TestCase):
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
     with treelog.context('my context'):
-      for i in treelog.iter('iter', 'abc'):
-        treelog.info(i)
+      for i, c in enumerate('abc'):
+        with treelog.context('iter', i):
+          treelog.info(c)
       with treelog.context('empty'):
         pass
       treelog.error('multiple..\n  ..lines')
@@ -64,38 +65,15 @@ class StdoutLog(Log):
     self.assertEqual(''.join(writes),
       'my message\n'
       'test.dat\n'
-      'my context > iter 0 (17%) > a\n'
-      'my context > iter 1 (50%) > b\n'
-      'my context > iter 2 (83%) > c\n'
+      'my context > iter 0 > a\n'
+      'my context > iter 1 > b\n'
+      'my context > iter 2 > c\n'
       'my context > multiple..\n'
       '  ..lines\n'
       'my context > test.dat > generating\n'
       'my context > test.dat\n'
       'generate_id > test.dat\n'
       'same\n')
-
-  def test_iter_warn(self):
-    log = treelog.StdoutLog()
-    with self.assertWarns(ResourceWarning):
-      for i in log.iter('range', range(9)):
-        if i == 2:
-          break
-
-  def test_iter_close(self):
-    log = treelog.StdoutLog()
-    r = log.iter('range', range(9))
-    for i in r:
-      if i == 2:
-        r.close()
-    self.assertEqual(i, 2)
-
-  def test_iter_context(self):
-    log = treelog.StdoutLog()
-    with log.iter('range', range(9)) as r:
-      for i in r:
-        if i == 2:
-          break
-    self.assertFalse(r.close())
 
 class RichOutputLog(Log):
 
@@ -106,9 +84,9 @@ class RichOutputLog(Log):
     self.assertEqual(writes, [
       '\x1b[K\x1b[1;34mmy message\x1b[0m\n',
       '\x1b[Ktest.dat\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 0 (17%) · \x1b[0ma\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 1 (50%) · \x1b[0mb\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 2 (83%) · \x1b[0mc\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 0 · \x1b[0ma\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 1 · \x1b[0mb\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 2 · \x1b[0mc\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;31mmultiple..\n  ..lines\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · test.dat · \x1b[0mgenerating\x1b[0m\n',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;34mtest.dat\x1b[0m\n',
@@ -142,15 +120,15 @@ class DataLog(Log):
   def output_tester(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       yield treelog.DataLog(tmpdir)
-      self.assertEqual(set(os.listdir(tmpdir)), {'test-1.dat', 'test-2.dat', 'test-3.dat', 'same-1', '.id'})
+      self.assertEqual(set(os.listdir(tmpdir)), {'test.dat', 'test-1.dat', 'test-2.dat', 'same', '.id'})
       self.assertEqual(os.listdir(os.path.join(tmpdir, '.id')), ['616263'])
-      with open(os.path.join(tmpdir, 'test-1.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test1')
-      with open(os.path.join(tmpdir, 'test-2.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-1.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test2')
-      with open(os.path.join(tmpdir, 'test-3.dat'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-2.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
-      with open(os.path.join(tmpdir, 'same-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'same'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
       with open(os.path.join(tmpdir, '.id', '616263'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
@@ -165,7 +143,7 @@ class DataLog(Log):
       os.mkdir(outdira)
       with log.infofile('dat', 'wb') as f:
         pass
-      self.assertEqual(os.listdir(outdirb), ['dat-1'])
+      self.assertEqual(os.listdir(outdirb), ['dat'])
       self.assertEqual(os.listdir(outdira), [])
 
   def test_remove_on_failure(self):
@@ -226,13 +204,13 @@ class HtmlLog(Log):
         '<div class="item" data-loglevel="2">my message</div>\n',
         '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
-        '<div class="context"><div class="title">iter 0 (17%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 0</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 1 (50%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
         '<div class="item" data-loglevel="1">b</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 2 (83%)</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
         '<div class="item" data-loglevel="1">c</div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4">multiple..\n',
@@ -292,29 +270,29 @@ class RecordLog(Log):
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('open_enter', 'test.dat', 'wb', 1, None),
-      ('open_exit', b'test1', None, None, None),
-      ('context_enter', 'my context'),
-      ('context_enter', 'iter 0 (17%)'),
+      ('open', 0, 'test.dat', 'wb', 1, None),
+      ('close', 0, b'test1'),
+      ('pushcontext', 'my context'),
+      ('pushcontext', 'iter 0'),
       ('write', 'a', 1),
-      ('context_exit', None, None, None),
-      ('context_enter', 'iter 1 (50%)'),
+      ('popcontext',),
+      ('pushcontext', 'iter 1'),
       ('write', 'b', 1),
-      ('context_exit', None, None, None),
-      ('context_enter', 'iter 2 (83%)'),
+      ('popcontext',),
+      ('pushcontext', 'iter 2'),
       ('write', 'c', 1),
-      ('context_exit', None, None, None),
+      ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open_enter', 'test.dat', 'wb+', 2, None),
+      ('open', 1, 'test.dat', 'wb+', 2, None),
       ('write', 'generating', 1),
-      ('open_exit', b'test2', None, None, None),
-      ('context_exit', None, None, None),
-      ('context_enter', 'generate_id'),
-      ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3', None, None, None),
-      ('context_exit', None, None, None),
-      ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3', None, None, None)])
+      ('close', 1, b'test2'),
+      ('popcontext',),
+      ('pushcontext', 'generate_id'),
+      ('open', 2, 'test.dat', 'wb', 3, b'abc'),
+      ('close', 2, b'test3'),
+      ('popcontext',),
+      ('open', 3, 'same', 'wb', 4, b'abc'),
+      ('close', 3, b'test3')])
     for Log in StdoutLog, RichOutputLog, DataLog, HtmlLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
@@ -345,7 +323,7 @@ class TeeLog(Log):
       with silent, teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_file_devnull(self):
@@ -354,7 +332,7 @@ class TeeLog(Log):
       with silent, teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_file_file(self):
@@ -363,9 +341,9 @@ class TeeLog(Log):
       with teelog.infofile('test', 'wb') as f:
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
-      with open(os.path.join(tmpdir, 'test-2'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
   def test_open_seekable_file(self):
@@ -376,7 +354,7 @@ class TeeLog(Log):
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
       self.assertEqual(recordlog._seen[b'abc'], b'test')
-      with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
+      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
 class FilterLog(Log):
@@ -387,17 +365,17 @@ class FilterLog(Log):
     yield treelog.FilterLog(recordlog, minlevel=2)
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('context_enter', 'my context'),
+      ('pushcontext', 'my context'),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open_enter', 'test.dat', 'wb+', 2, None),
-      ('open_exit', b'test2', None, None, None),
-      ('context_exit', None, None, None),
-      ('context_enter', 'generate_id'),
-      ('open_enter', 'test.dat', 'wb', 3, b'abc'),
-      ('open_exit', b'test3', None, None, None),
-      ('context_exit', None, None, None),
-      ('open_enter', 'same', 'wb', 4, b'abc'),
-      ('open_exit', b'test3', None, None, None)])
+      ('open', 0, 'test.dat', 'wb+', 2, None),
+      ('close', 0, b'test2'),
+      ('popcontext',),
+      ('pushcontext', 'generate_id'),
+      ('open', 1, 'test.dat', 'wb', 3, b'abc'),
+      ('close', 1, b'test3'),
+      ('popcontext',),
+      ('open', 2, 'same', 'wb', 4, b'abc'),
+      ('close', 2, b'test3')])
 
 class LoggingLog(Log):
 
@@ -408,9 +386,9 @@ class LoggingLog(Log):
     self.assertEqual(cm.output, [
       'Level 25:nutils:my message',
       'INFO:nutils:test.dat',
-      'INFO:nutils:my context > iter 0 (17%) > a',
-      'INFO:nutils:my context > iter 1 (50%) > b',
-      'INFO:nutils:my context > iter 2 (83%) > c',
+      'INFO:nutils:my context > iter 0 > a',
+      'INFO:nutils:my context > iter 1 > b',
+      'INFO:nutils:my context > iter 2 > c',
       'ERROR:nutils:my context > multiple..\n  ..lines',
       'INFO:nutils:my context > test.dat > generating',
       'Level 25:nutils:my context > test.dat',

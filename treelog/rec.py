@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, sys
+import contextlib
 from . import abc, _io
 
 class RecordLog(abc.Log):
@@ -41,26 +41,26 @@ class RecordLog(abc.Log):
 
   def __init__(self):
     # Replayable log messages.  Each entry is a tuple of `(cmd, *args)`, where
-    # `cmd` is either 'context_enter', 'context_exit', 'open_enter',
-    # 'open_exit' or 'write'.  See `self.replay` below.
+    # `cmd` is either 'pushcontext', 'popcontext', 'open',
+    # 'close' or 'write'.  See `self.replay` below.
     self._messages = []
+    self._fid = 0 # internal file counter
     self._seen = {}
 
-  @contextlib.contextmanager
-  def context(self, title):
-    self._messages.append(('context_enter', title))
-    n = len(self._messages)
-    try:
-      yield
-    finally:
-      if len(self._messages) == n:
-        self._messages.pop() # remove empty context
-      else:
-        self._messages.append(('context_exit',) + sys.exc_info())
+  def pushcontext(self, title):
+    self._messages.append(('pushcontext', title))
+
+  def popcontext(self):
+    if self._messages and self._messages[-1][0] == 'pushcontext':
+      self._messages.pop()
+    else:
+      self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
-    self._messages.append(('open_enter', filename, mode, level, id))
+    fid = self._fid
+    self._fid += 1
+    self._messages.append(('open', fid, filename, mode, level, id))
     try:
       data = self._seen.get(id)
       if data is not None:
@@ -74,7 +74,7 @@ class RecordLog(abc.Log):
         if id:
           self._seen[id] = data
     finally:
-      self._messages.append(('open_exit', data) + sys.exc_info())
+      self._messages.append(('close', fid, data))
 
   def write(self, text, level):
     self._messages.append(('write', text, level))
@@ -85,26 +85,27 @@ class RecordLog(abc.Log):
     All recorded messages and files will be written to the log that is either
     directly specified or currently active.'''
 
-    contexts = []
+    files = {}
     if log is None:
       from . import current as log
     for cmd, *args in self._messages:
-      if cmd == 'context_enter':
-        ctx = log.context(*args)
-        ctx.__enter__()
-        contexts.append(ctx)
-      elif cmd == 'context_exit':
-        ctx = contexts.pop()
-        ctx.__exit__(*args)
-      elif cmd == 'open_enter':
-        ctx = log.open(*args)
-        contexts.append((ctx, ctx.__enter__()))
-      elif cmd == 'open_exit':
-        ctx, f = contexts.pop()
-        if args[0] is not None:
-          f.write(args[0])
-        ctx.__exit__(*args[1:])
+      if cmd == 'pushcontext':
+        title, = args
+        log.pushcontext(title)
+      elif cmd == 'popcontext':
+        log.popcontext()
+      elif cmd == 'open':
+        fid, filename, mode, level, id = args
+        ctx = log.open(filename, mode, level=level, id=id)
+        files[fid] = ctx, ctx.__enter__()
+      elif cmd == 'close':
+        fid, data = args
+        ctx, f = files.pop(fid)
+        if data is not None:
+          f.write(data)
+        ctx.__exit__(None, None, None)
       elif cmd == 'write':
-        log.write(*args)
+        text, level = args
+        log.write(text, level=level)
 
 # vim:sw=2:sts=2:et

@@ -18,59 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import abc, functools, warnings
+import abc, functools, warnings, contextlib
 from . import _io
-
-class Closing(abc.ABC):
-  '''Base class for enterable objects that close upon exit.
-
-  A subclass should define the :meth:`close` method for cleanup that returns a
-  true value if the object was found to be open.'''
-
-  @abc.abstractmethod
-  def close(self):
-    raise NotImplementedError
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, *args):
-    self.close()
-
-  def __del__(self):
-    if self.close():
-      warnings.warn('unclosed object {!r}'.format(self), ResourceWarning)
-
-class ClosingGenerator(Closing):
-  '''Enterable generator that close upon exit.
-
-  Generator wrapper that tracks whether the generator was exhausted or closed
-  manually to enable a destruction warning.'''
-
-  @classmethod
-  def compose(cls, f):
-    return functools.wraps(f)(lambda *args, **kwargs: cls(f(*args, **kwargs)))
-
-  def __init__(self, gen):
-    self._gen = gen
-
-  def __iter__(self):
-    return self
-
-  def __next__(self):
-    if not self._gen:
-      raise StopIteration
-    try:
-      return next(self._gen)
-    except StopIteration:
-      self._gen = None
-      raise
-
-  def close(self):
-    if self._gen:
-      self._gen.close()
-      self._gen = None
-      return True
 
 class Log(abc.ABC):
   '''Abstract base class for log objects.
@@ -80,7 +29,11 @@ class Log(abc.ABC):
   method that returns a file context.'''
 
   @abc.abstractmethod
-  def context(self, title):
+  def pushcontext(self, title):
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def popcontext(self):
     raise NotImplementedError
 
   @abc.abstractmethod
@@ -91,19 +44,13 @@ class Log(abc.ABC):
   def open(self, filename, mode, level, id):
     raise NotImplementedError
 
-  @ClosingGenerator.compose
-  def iter(self, title, iterable, length=None):
-    if length is None:
-      try:
-        length = len(iterable)
-      except:
-        pass
-    for i, val in enumerate(iterable):
-      text = '{} {}'.format(title, i)
-      if length:
-        text += ' ({:.0f}%)'.format(100 * (i+.5) / length)
-      with self.context(text):
-        yield val
+  @contextlib.contextmanager
+  def context(self, *args, sep=' '):
+    self.pushcontext(sep.join(map(str, args)))
+    try:
+      yield
+    finally:
+      self.popcontext()
 
   def _factory(level):
 
