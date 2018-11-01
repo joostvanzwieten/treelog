@@ -96,8 +96,8 @@ class Log(abc.ABC):
     raise NotImplementedError
 
   @contextlib.contextmanager
-  def context(self, text):
-    self.pushcontext(text)
+  def context(self, *args, sep=' '):
+    self.pushcontext(sep.join(map(str, args)))
     try:
       yield
     finally:
