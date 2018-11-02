@@ -163,4 +163,13 @@ def sequence(filename):
     yield '-{}'.format(i).join(splitext)
     i += 1
 
+def set_ansi_console():
+  import platform
+  if platform.system() == 'Windows':
+    if platform.version() < '10.':
+      raise RuntimeError('ANSI console mode requires Windows 10 or higher, detected {}'.format(platform.version()))
+    from ctypes import windll
+    handle = windll.kernel32.GetStdHandle(-11) # https://docs.microsoft.com/en-us/windows/console/getstdhandle
+    windll.kernel32.SetConsoleMode(handle, 7) # https://docs.microsoft.com/en-us/windows/console/setconsolemode
+
 # vim:sw=2:sts=2:et

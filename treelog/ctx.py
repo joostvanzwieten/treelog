@@ -89,6 +89,7 @@ class RichOutputLog(ContextLog):
 
   def __init__(self, interval=.1):
     super().__init__()
+    _io.set_ansi_console()
     self._thread = self.Thread(self._context, interval)
 
   def pushcontext(self, title):
