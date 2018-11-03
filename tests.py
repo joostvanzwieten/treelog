@@ -83,15 +83,25 @@ class RichOutputLog(Log):
       yield treelog.RichOutputLog(interval=99)
     self.assertEqual(writes, [
       '\x1b[K\x1b[1;34mmy message\x1b[0m\n',
+      '\x1b[K\r',
       '\x1b[Ktest.dat\x1b[0m\n',
+      '\x1b[K\r',
       '\x1b[K\x1b[1;30mmy context · iter 0 · \x1b[0ma\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 0\x1b[0m\r',
       '\x1b[K\x1b[1;30mmy context · iter 1 · \x1b[0mb\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 1\x1b[0m\r',
       '\x1b[K\x1b[1;30mmy context · iter 2 · \x1b[0mc\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · iter 2\x1b[0m\r',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;31mmultiple..\n  ..lines\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context\x1b[0m\r',
       '\x1b[K\x1b[1;30mmy context · test.dat · \x1b[0mgenerating\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context · test.dat\x1b[0m\r',
       '\x1b[K\x1b[1;30mmy context · \x1b[1;34mtest.dat\x1b[0m\n',
+      '\x1b[K\x1b[1;30mmy context\x1b[0m\r',
       '\x1b[K\x1b[1;30mgenerate_id · \x1b[0;31mtest.dat\x1b[0m\n',
-      '\x1b[K\x1b[1;31msame\x1b[0m\n'])
+      '\x1b[K\x1b[1;30mgenerate_id\x1b[0m\r',
+      '\x1b[K\x1b[1;31msame\x1b[0m\n',
+      '\x1b[K\r'])
 
   def test_thread(self):
     import _thread
@@ -112,6 +122,7 @@ class RichOutputLog(Log):
     self.assertEqual(writes, [
       '\x1b[K\x1b[1;30mA\x1b[0m\r',
       '\x1b[KB\x1b[0m\n',
+      '\x1b[K\r',
       '\x1b[K\x1b[1;30mC · D\x1b[0m\r'])
 
 class DataLog(Log):

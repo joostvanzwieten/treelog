@@ -56,37 +56,49 @@ class StdoutLog(ContextLog):
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
 
+  class Thread:
+    def __init__(self, context, interval):
+      import _thread
+      self._context = context
+      self._alive = True
+      self._uptodate = True
+      self._lock = _thread.allocate_lock() # to be acquired by run, released by main thread
+      _thread.start_new_thread(self.run, (interval,))
+    def release_lock(self):
+      if self._lock.locked():
+        self._lock.release()
+    def signal_stop(self):
+      self._alive = False
+      self._uptodate = False
+      self.release_lock()
+    def signal_contextchange(self):
+      if self._uptodate:
+        self._uptodate = False
+        self.release_lock()
+    def print_context(self):
+      sys.stdout.write('\033[K\033[1;30m' + ' · '.join(self._context) + '\033[0m\r' if self._context else '\033[K\r')
+      self._uptodate = True
+    def run(self, interval):
+      try:
+        while self._alive:
+          if not self._lock.acquire(timeout=-1 if self._uptodate else interval):
+            # acquire timed out, implies _uptodate == False
+            self.print_context()
+      except Exception as e:
+        sys.stdout.write('\033[Kcontext thread died unexpectedly: {}\n'.format(e))
+
   def __init__(self, interval=.1):
-    import _thread
     super().__init__()
-    self._sleep = _thread.allocate_lock() # to be acquired by thread, released by self
-    self._state = [True, True] # mutable shared state: [alive, asleep]
-    _thread.start_new_thread(self._context_thread, (self._context, self._sleep, self._state, interval))
-
-  @staticmethod
-  def _context_thread(context, sleep, state, interval): # pragma: no cover (tested via stdout)
-    try:
-      while state[0]: # alive
-        if not sleep.acquire(timeout=-1 if state[1] else interval): # timed out
-          sys.stdout.write('\033[K\033[1;30m' + ' · '.join(context) + '\033[0m\r' if context else '\033[K\r')
-          state[1] = True # asleep
-    except Exception as e:
-      sys.stdout.write('\033[Kcontext thread died unexpectedly: {}\n'.format(e))
-
-  def _trigger_thread(self):
-    self._state[1] = False # awake
-    if self._sleep.locked():
-      self._sleep.release()
+    _io.set_ansi_console()
+    self._thread = self.Thread(self._context, interval)
 
   def pushcontext(self, title):
     super().pushcontext(title)
-    if self._state[1]: # asleep
-      self._trigger_thread()
+    self._thread.signal_contextchange()
 
   def popcontext(self):
     super().popcontext()
-    if self._state[1]: # asleep
-      self._trigger_thread()
+    self._thread.signal_contextchange()
 
   def write(self, text, level):
     line = '\033[K' # clear line
@@ -103,12 +115,12 @@ class RichOutputLog(ContextLog):
     line += text
     line += '\033[0m\n' # reset and newline
     sys.stdout.write(line)
-    self._trigger_thread()
+    self._thread.print_context()
+    self._thread.release_lock()
 
   def __del__(self):
-    if hasattr(self, '_state'):
-      self._state[0] = False # signal that the thread should stop
-      self._trigger_thread()
+    if hasattr(self, '_thread'):
+      self._thread.signal_stop()
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
