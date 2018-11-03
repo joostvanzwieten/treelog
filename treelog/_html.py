@@ -24,7 +24,7 @@ from . import _base, _io
 class HtmlLog(_base.Log):
   '''Output html nested lists.'''
 
-  def __init__(self, dirpath, *, filename='log.html', title=None):
+  def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None):
     self._dir = _io.directory(dirpath)
     for self.filename in _io.sequence(filename):
       self._file = self._dir.open(self.filename, 'w')
@@ -38,7 +38,9 @@ class HtmlLog(_base.Log):
       f.write(JS)
     if title is None:
       title = ' '.join(sys.argv)
-    self._file.write(HTMLHEAD.format(title=title, css=css, js=js))
+    if htmltitle is None:
+      htmltitle = html.escape(title)
+    self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js))
     self._html_depth = 0 # number of currently open html elements nested under the "log" div
     self._context = []
 
@@ -110,7 +112,7 @@ HTMLHEAD = '''\
 <link rel="stylesheet" type="text/css" href="{css}"/>
 </head>
 <body>
-<div id="header"><div id="bar"><p>{title}</p></div></div>
+<div id="header"><div id="bar"><div id="text"><div id="title">{htmltitle}</div></div></div></div>
 <div id="log">
 '''
 
@@ -137,15 +139,14 @@ body[data-show='theater'] #bar { background: hsl(140,46%,45%); }
 body[data-show='theater'] #header > .dropdown { background: hsla(140,46%,90%,0.9); border-bottom: 2px solid hsl(140,46%,45%); }
 #bar, #header > .dropdown { transition: background .25s, border-bottom-color .25s; }
 
-#bar > * { margin: 0px 4px; }
-#bar .label { flex: 1 1 auto; }
-#bar .icon { flex: 0 0 auto; }
-
-#bar .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bar > *, #text > * { margin: 0px 4px; }
+#text { display: flex; flex-direction: row; align-items: center; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#text :first-child { margin-left: 0px; }
+#text :last-child { margin-right: 0px; }
+#title { font-weight: bold; }
 
 #bar svg { stroke: #fffb; fill: #fffb; }
-#bar p { font-weight: bold; }
-#bar .icon { width: 32px; height: 32px; border-radius: 2px; }
+#bar .icon { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 2px; }
 #bar .small-icon-container { display: grid; align-items: center; justify-items: center; }
 #bar .icon.button { transition: background .25s; }
 #bar .icon.button:hover { background: #fff4; }
@@ -780,9 +781,8 @@ window.addEventListener('load', function() {
 
   var bar = document.getElementById('bar');
   // labels, only one is visible at a time
-  bar.appendChild(create_element('div', {'class': 'show-if-log hide-if-droppeddown label'}, (document.body.dataset.scriptname || '') + ' ' + (document.body.dataset.funcname || '')));
-  bar.appendChild(create_element('div', {id: 'theater-label', 'class': 'show-if-theater hide-if-droppeddown button label', title: 'exit theater and open log here', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater._open_log();}}}));
-  bar.appendChild(create_element('div', {'class': 'show-if-droppeddown label'}, 'keyboard shortcuts'));
+  document.getElementById('text').appendChild(create_element('div', {id: 'theater-label', 'class': 'show-if-theater hide-if-droppeddown button label', title: 'exit theater and open log here', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater._open_log();}}}));
+  document.getElementById('text').appendChild(create_element('div', {'class': 'show-if-droppeddown label'}, 'keyboard shortcuts'));
   // log level indicator, visible in log mode
   bar.appendChild(create_element('div', {'class': 'show-if-log icon small-icon-container', id: 'log-level-indicator'}));
   // category lock button, visible in theater mode

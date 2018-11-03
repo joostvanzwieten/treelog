@@ -211,7 +211,7 @@ class HtmlLog(Log):
         '<link rel="stylesheet" type="text/css" href="{}"/>\n'.format(css),
         '</head>\n',
         '<body>\n',
-        '<div id="header"><div id="bar"><p>test</p></div></div>\n',
+        '<div id="header"><div id="bar"><div id="text"><div id="title">test</div></div></div></div>\n',
         '<div id="log">\n',
         '<div class="item" data-loglevel="2">my message</div>\n',
         '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat">test.dat</a></div>\n',
