@@ -24,7 +24,7 @@ from . import _base, _io
 class HtmlLog(_base.Log):
   '''Output html nested lists.'''
 
-  def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None):
+  def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None, favicon=None):
     self._dir = _io.directory(dirpath)
     for self.filename in _io.sequence(filename):
       self._file = self._dir.open(self.filename, 'w')
@@ -40,7 +40,9 @@ class HtmlLog(_base.Log):
       title = ' '.join(sys.argv)
     if htmltitle is None:
       htmltitle = html.escape(title)
-    self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js))
+    if favicon is None:
+      favicon = FAVICON
+    self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js, favicon=favicon))
     self._html_depth = 0 # number of currently open html elements nested under the "log" div
     self._context = []
 
@@ -110,6 +112,7 @@ HTMLHEAD = '''\
 <title>{title}</title>
 <script src="{js}"></script>
 <link rel="stylesheet" type="text/css" href="{css}"/>
+<link rel="icon" href="{favicon}"/>
 </head>
 <body>
 <div id="header"><div id="bar"><div id="text"><div id="title">{htmltitle}</div></div></div></div>
@@ -812,5 +815,11 @@ window.addEventListener('load', function() {
   state_control = 'enabled';
 });
 '''
+
+FAVICON = 'data:image/png;base64,' \
+  'iVBORw0KGgoAAAANSUhEUgAAANIAAADSAgMAAABC93bRAAAACVBMVEUAAGcAAAD////NzL25' \
+  'AAAAAXRSTlMAQObYZgAAAFtJREFUaN7t2SEOACEMRcEa7ofh/ldBsJJAS1bO86Ob/MZY9ViN' \
+  'TD0oiqIo6qrOURRFUVRepQ4TRVEURdXVV6MoiqKoV2UJpCiKov7+p1AURVFUWZWiKIqiqI2a' \
+  '8O8qJ0n+GP4AAAAASUVORK5CYII='
 
 # vim:sw=2:sts=2:et

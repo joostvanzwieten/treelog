@@ -193,23 +193,12 @@ class HtmlLog(Log):
       with self.assertSilent(), treelog.HtmlLog(tmpdir, title='test') as htmllog:
         yield htmllog
       self.assertEqual(htmllog.filename, 'log.html')
-      from treelog._html import CSS, JS
-      css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
-      js = hashlib.sha1(JS.encode()).hexdigest() + '.js'
-      self.assertEqual(set(os.listdir(tmpdir)), {'log.html', js, css, '616263.dat', '616263',
+      self.assertGreater(set(os.listdir(tmpdir)), {'log.html', '616263.dat', '616263',
         'b444ac06613fc8d63795be9ad0beaf55011936ac.dat', '109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat'})
       with open(os.path.join(tmpdir, 'log.html'), 'r') as f:
         lines = f.readlines()
-      self.assertEqual(lines, [
-        '<!DOCTYPE html>\n',
-        '<html>\n',
-        '<head>\n',
-        '<meta charset="UTF-8"/>\n',
-        '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"/>\n',
-        '<title>test</title>\n',
-        '<script src="{}"></script>\n'.format(js),
-        '<link rel="stylesheet" type="text/css" href="{}"/>\n'.format(css),
-        '</head>\n',
+      self.assertIn('<body>\n', lines)
+      self.assertEqual(lines[lines.index('<body>\n'):], [
         '<body>\n',
         '<div id="header"><div id="bar"><div id="text"><div id="title">test</div></div></div></div>\n',
         '<div id="log">\n',
