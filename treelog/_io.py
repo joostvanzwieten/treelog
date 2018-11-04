@@ -168,8 +168,11 @@ def set_ansi_console():
   if platform.system() == 'Windows':
     if platform.version() < '10.':
       raise RuntimeError('ANSI console mode requires Windows 10 or higher, detected {}'.format(platform.version()))
-    from ctypes import windll
-    handle = windll.kernel32.GetStdHandle(-11) # https://docs.microsoft.com/en-us/windows/console/getstdhandle
-    windll.kernel32.SetConsoleMode(handle, 7) # https://docs.microsoft.com/en-us/windows/console/setconsolemode
+    import ctypes
+    handle = ctypes.windll.kernel32.GetStdHandle(-11) # https://docs.microsoft.com/en-us/windows/console/getstdhandle
+    mode = ctypes.c_uint32() # https://docs.microsoft.com/en-us/windows/desktop/WinProg/windows-data-types#lpdword
+    ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)) # https://docs.microsoft.com/en-us/windows/console/getconsolemode
+    mode.value |= 4 # add ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    ctypes.windll.kernel32.SetConsoleMode(handle, mode) # https://docs.microsoft.com/en-us/windows/console/setconsolemode
 
 # vim:sw=2:sts=2:et
