@@ -85,7 +85,7 @@ class HtmlLog(_base.Log):
       realname = self._dir.hash(fname, 'sha1').hex() + ext
       self._dir.link(fname, realname)
       self._dir.unlink(fname)
-    self.write('<a href="{href}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
+    self.write('<a href="{href}" download="{name}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
 
   def close(self):
     if hasattr(self, '_file') and not self._file.closed:

@@ -203,7 +203,7 @@ class HtmlLog(Log):
         '<div id="header"><div id="bar"><div id="text"><div id="title">test</div></div></div></div>\n',
         '<div id="log">\n',
         '<div class="item" data-loglevel="2">my message</div>\n',
-        '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat" download="test.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
         '<div class="context"><div class="title">iter 0</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
@@ -219,12 +219,12 @@ class HtmlLog(Log):
         '<div class="context"><div class="title">test.dat</div><div class="children">\n',
         '<div class="item" data-loglevel="1">generating</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="item" data-loglevel="2"><a href="109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="2"><a href="109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="context"><div class="title">generate_id</div><div class="children">\n',
-        '<div class="item" data-loglevel="3"><a href="616263.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="3"><a href="616263.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="item" data-loglevel="4"><a href="616263">same</a></div>\n',
+        '<div class="item" data-loglevel="4"><a href="616263" download="same">same</a></div>\n',
         '</div></body></html>\n'])
       with open(os.path.join(tmpdir, 'b444ac06613fc8d63795be9ad0beaf55011936ac.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test1')
