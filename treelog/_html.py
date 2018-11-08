@@ -43,22 +43,21 @@ class HtmlLog(_base.Log):
     if favicon is None:
       favicon = FAVICON
     self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js, favicon=favicon))
-    self._html_depth = 0 # number of currently open html elements nested under the "log" div
-    self._context = []
+    self._unopened = [] # active contexts that are not yet opened as html elements
 
   def pushcontext(self, title):
-    self._context.append(title)
+    self._unopened.append(title)
 
   def popcontext(self):
-    if self._html_depth == len(self._context):
+    if self._unopened:
+      self._unopened.pop()
+    else:
       print('</div><div class="end"></div></div>', file=self._file)
-      self._html_depth -= 1
-    self._context.pop()
 
   def write(self, text, level, escape=True):
-    for c in self._context[self._html_depth:]:
+    for c in self._unopened:
       print('<div class="context"><div class="title">{}</div><div class="children">'.format(html.escape(c)), file=self._file)
-    self._html_depth = len(self._context)
+    self._unopened.clear()
     if escape:
       text = html.escape(text)
     print('<div class="item" data-loglevel="{}">{}</div>'.format(level, text), file=self._file, flush=True)
