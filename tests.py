@@ -193,7 +193,7 @@ class HtmlLog(Log):
       with self.assertSilent(), treelog.HtmlLog(tmpdir, title='test') as htmllog:
         yield htmllog
       self.assertEqual(htmllog.filename, 'log.html')
-      from treelog.htm import CSS, JS
+      from treelog._html import CSS, JS
       css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
       js = hashlib.sha1(JS.encode()).hexdigest() + '.js'
       self.assertEqual(set(os.listdir(tmpdir)), {'log.html', js, css, '616263.dat', '616263',

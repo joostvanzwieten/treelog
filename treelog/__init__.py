@@ -22,12 +22,11 @@ version = '1.0b2'
 
 import sys, functools, contextlib
 
-from .abc import Log
-from .fwd import TeeLog, FilterLog
-from .ctx import StdoutLog, RichOutputLog, LoggingLog
-from .dat import DataLog
-from .rec import RecordLog
-from .htm import HtmlLog
+from ._base import Log
+from ._forward import TeeLog, FilterLog
+from ._silent import DataLog, RecordLog
+from ._text import StdoutLog, RichOutputLog, LoggingLog
+from ._html import HtmlLog
 
 current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1)
 
@@ -64,11 +63,11 @@ if sys.version_info < (3,7):
   def _factory(name):
     def wrapper(*args, **kwargs):
       return __getattr__(name)(*args, **kwargs)
-    wrapper.__doc__ = getattr(abc.Log, name).__doc__
+    wrapper.__doc__ = getattr(Log, name).__doc__
     wrapper.__name__ = name
     wrapper.__qualname__ = name
     return wrapper
-  locals().update((name, _factory(name)) for name in dir(abc.Log))
+  locals().update((name, _factory(name)) for name in dir(Log))
   del _factory
 
 # vim:sw=2:sts=2:et
