@@ -21,6 +21,20 @@
 import os, contextlib, functools
 from . import _base, _io
 
+class NullLog(_base.Log):
+
+  def pushcontext(self, title):
+    pass
+
+  def popcontext(self):
+    pass
+
+  def write(self, text, level):
+    pass
+
+  def open(self, filename, mode, level, id):
+    return _io.devnull(filename)
+
 class DataLog(_base.Log):
   '''Output only data.'''
 

@@ -406,6 +406,17 @@ class LoggingLog(Log):
       'WARNING:nutils:generate_id > test.dat',
       'ERROR:nutils:same'])
 
+class NullLog(Log):
+
+  @contextlib.contextmanager
+  def output_tester(self):
+    with self.assertSilent():
+      yield treelog.NullLog()
+
+  def test_disable(self):
+    with treelog.disable():
+      self.assertIsInstance(treelog.current, treelog.NullLog)
+
 del Log # hide from unittest discovery
 
 ## INTERNALS

@@ -24,7 +24,7 @@ import sys, functools, contextlib
 
 from ._base import Log
 from ._forward import TeeLog, FilterLog
-from ._silent import DataLog, RecordLog
+from ._silent import NullLog, DataLog, RecordLog
 from ._text import StdoutLog, RichOutputLog, LoggingLog
 from ._html import HtmlLog
 
@@ -46,6 +46,11 @@ def add(logger):
   '''Add logger to current.'''
 
   return set(TeeLog(current, logger))
+
+def disable():
+  '''Disable logger.'''
+
+  return set(NullLog())
 
 def withcontext(f):
   '''Decorator; executes the wrapped function in its own logging context.'''
