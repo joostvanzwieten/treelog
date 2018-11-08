@@ -18,8 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import abc, functools, warnings, contextlib
-from . import _io
+import abc, contextlib
 
 class Log(abc.ABC):
   '''Abstract base class for log objects.
