@@ -19,9 +19,9 @@
 # THE SOFTWARE.
 
 import contextlib, logging, sys
-from . import abc, _io
+from . import _base, _io
 
-class ContextLog(abc.Log):
+class ContextLog(_base.Log):
   '''Base class for loggers that keep track of the current list of contexts.
 
   The base class implements :meth:`context` and :meth:`open` which keep the

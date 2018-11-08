@@ -18,10 +18,62 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib
-from . import abc, _io
+import os, contextlib, functools
+from . import _base, _io
 
-class RecordLog(abc.Log):
+class NullLog(_base.Log):
+
+  def pushcontext(self, title):
+    pass
+
+  def popcontext(self):
+    pass
+
+  def write(self, text, level):
+    pass
+
+  def open(self, filename, mode, level, id):
+    return _io.devnull(filename)
+
+class DataLog(_base.Log):
+  '''Output only data.'''
+
+  def __init__(self, dirpath=os.curdir, names=_io.sequence):
+    self._names = functools.lru_cache(maxsize=32)(names)
+    self._dir = _io.directory(dirpath)
+
+  @contextlib.contextmanager
+  def open(self, filename, mode, level, id):
+    f = None
+    try:
+      if id is None:
+        f, fname = self._dir.temp(mode, name=filename)
+      else:
+        self._dir.mkdir('.id')
+        fname = os.path.join('.id', id.hex())
+        f = self._dir.open(fname, mode, name=filename)
+      with f:
+        yield f
+    except:
+      if f:
+        self._dir.unlink(fname)
+      raise
+    for realname in self._names(filename):
+      if self._dir.link(fname, realname):
+        break
+    if id is None:
+      self._dir.unlink(fname)
+
+  def pushcontext(self, title):
+    pass
+
+  def popcontext(self):
+    pass
+
+  def write(self, text, level):
+    pass
+
+class RecordLog(_base.Log):
   '''Record log messages.
 
   The recorded messages can be replayed to the logs that are currently active
@@ -107,5 +159,3 @@ class RecordLog(abc.Log):
       elif cmd == 'write':
         text, level = args
         log.write(text, level=level)
-
-# vim:sw=2:sts=2:et

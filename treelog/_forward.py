@@ -19,9 +19,9 @@
 # THE SOFTWARE.
 
 import contextlib
-from . import abc, _io
+from . import _base, _io
 
-class TeeLog(abc.Log):
+class TeeLog(_base.Log):
   '''Forward messages to two underlying loggers.'''
 
   def __init__(self, baselog1, baselog2):
@@ -63,7 +63,7 @@ class TeeLog(abc.Log):
         f1.write(data)
         f2.write(data)
 
-class FilterLog(abc.Log):
+class FilterLog(_base.Log):
   '''Filter messages based on level.'''
 
   def __init__(self, baselog, minlevel):

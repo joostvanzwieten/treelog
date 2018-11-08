@@ -19,9 +19,9 @@
 # THE SOFTWARE.
 
 import contextlib, sys, os, urllib.parse, html, hashlib
-from . import abc, _io
+from . import _base, _io
 
-class HtmlLog(abc.Log):
+class HtmlLog(_base.Log):
   '''Output html nested lists.'''
 
   def __init__(self, dirpath, *, filename='log.html', title=None):

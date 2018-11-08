@@ -193,7 +193,7 @@ class HtmlLog(Log):
       with self.assertSilent(), treelog.HtmlLog(tmpdir, title='test') as htmllog:
         yield htmllog
       self.assertEqual(htmllog.filename, 'log.html')
-      from treelog.htm import CSS, JS
+      from treelog._html import CSS, JS
       css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
       js = hashlib.sha1(JS.encode()).hexdigest() + '.js'
       self.assertEqual(set(os.listdir(tmpdir)), {'log.html', js, css, '616263.dat', '616263',
@@ -405,6 +405,17 @@ class LoggingLog(Log):
       'Level 25:nutils:my context > test.dat',
       'WARNING:nutils:generate_id > test.dat',
       'ERROR:nutils:same'])
+
+class NullLog(Log):
+
+  @contextlib.contextmanager
+  def output_tester(self):
+    with self.assertSilent():
+      yield treelog.NullLog()
+
+  def test_disable(self):
+    with treelog.disable():
+      self.assertIsInstance(treelog.current, treelog.NullLog)
 
 del Log # hide from unittest discovery
 
