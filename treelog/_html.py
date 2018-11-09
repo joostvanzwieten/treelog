@@ -24,7 +24,7 @@ from . import _base, _io
 class HtmlLog(_base.Log):
   '''Output html nested lists.'''
 
-  def __init__(self, dirpath, *, filename='log.html', title=None):
+  def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None, favicon=None):
     self._dir = _io.directory(dirpath)
     for self.filename in _io.sequence(filename):
       self._file = self._dir.open(self.filename, 'w')
@@ -38,23 +38,26 @@ class HtmlLog(_base.Log):
       f.write(JS)
     if title is None:
       title = ' '.join(sys.argv)
-    self._file.write(HTMLHEAD.format(title=title, css=css, js=js))
-    self._html_depth = 0 # number of currently open html elements nested under the "log" div
-    self._context = []
+    if htmltitle is None:
+      htmltitle = html.escape(title)
+    if favicon is None:
+      favicon = FAVICON
+    self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js, favicon=favicon))
+    self._unopened = [] # active contexts that are not yet opened as html elements
 
   def pushcontext(self, title):
-    self._context.append(title)
+    self._unopened.append(title)
 
   def popcontext(self):
-    if self._html_depth == len(self._context):
+    if self._unopened:
+      self._unopened.pop()
+    else:
       print('</div><div class="end"></div></div>', file=self._file)
-      self._html_depth -= 1
-    self._context.pop()
 
   def write(self, text, level, escape=True):
-    for c in self._context[self._html_depth:]:
+    for c in self._unopened:
       print('<div class="context"><div class="title">{}</div><div class="children">'.format(html.escape(c)), file=self._file)
-    self._html_depth = len(self._context)
+    self._unopened.clear()
     if escape:
       text = html.escape(text)
     print('<div class="item" data-loglevel="{}">{}</div>'.format(level, text), file=self._file, flush=True)
@@ -81,7 +84,7 @@ class HtmlLog(_base.Log):
       realname = self._dir.hash(fname, 'sha1').hex() + ext
       self._dir.link(fname, realname)
       self._dir.unlink(fname)
-    self.write('<a href="{href}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
+    self.write('<a href="{href}" download="{name}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
 
   def close(self):
     if hasattr(self, '_file') and not self._file.closed:
@@ -108,8 +111,10 @@ HTMLHEAD = '''\
 <title>{title}</title>
 <script src="{js}"></script>
 <link rel="stylesheet" type="text/css" href="{css}"/>
+<link rel="icon" href="{favicon}"/>
 </head>
 <body>
+<div id="header"><div id="bar"><div id="text"><div id="title">{htmltitle}</div></div></div></div>
 <div id="log">
 '''
 
@@ -125,29 +130,28 @@ a, a:visited, a:hover { color: inherit; text-decoration: underline; }
 .button { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -moz-user-select: none; -webkit-user-select: none; }
 
 #header { position: fixed; top: 0px; left: 0px; right: 0px; z-index: 2; }
-#header > .bar { height: 48px; display: flex; width: 100%; padding: 0px 4px; box-sizing: border-box; align-items: center; }
+#bar { height: 48px; display: flex; width: 100%; padding: 0px 4px; box-sizing: border-box; align-items: center; }
 #log, #theater { position: fixed; top: 48px; left: 0px; right: 0px; bottom: 0px; width: 100%; height: calc(100% - 48px); }
 #log { overflow: auto; padding: 10px; box-sizing: border-box; }
 
 #header { box-shadow: 0px 0px 4px 2px hsla(0,0%,0%,0.25); }
-#header > .bar { color: #fff; background: hsl(205,46%,45%); }
+#bar { color: #fff; background: hsl(205,46%,45%); }
 #header > .dropdown { background: hsla(205,46%,90%,0.9); border-bottom: 2px solid hsl(205,46%,45%); color: #000; }
-body[data-show='theater'] #header > .bar { background: hsl(140,46%,45%); }
+body[data-show='theater'] #bar { background: hsl(140,46%,45%); }
 body[data-show='theater'] #header > .dropdown { background: hsla(140,46%,90%,0.9); border-bottom: 2px solid hsl(140,46%,45%); }
-#header > .bar, #header > .dropdown { transition: background .25s, border-bottom-color .25s; }
+#bar, #header > .dropdown { transition: background .25s, border-bottom-color .25s; }
 
-#header > .bar > * { margin: 0px 4px; }
-#header > .bar .label { flex: 1 1 auto; }
-#header > .bar .icon { flex: 0 0 auto; }
+#bar > *, #text > * { margin: 0px 4px; }
+#text { display: flex; flex-direction: row; align-items: center; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#text :first-child { margin-left: 0px; }
+#text :last-child { margin-right: 0px; }
+#title { font-weight: bold; }
 
-#header > .bar .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-#header > .bar svg { stroke: #fffb; fill: #fffb; }
-#header > .bar p { font-weight: bold; }
-#header > .bar .icon { width: 32px; height: 32px; border-radius: 2px; }
-#header > .bar .small-icon-container { display: grid; align-items: center; justify-items: center; }
-#header > .bar .icon.button { transition: background .25s; }
-#header > .bar .icon.button:hover { background: #fff4; }
+#bar svg { stroke: #fffb; fill: #fffb; }
+#bar .icon { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 2px; }
+#bar .small-icon-container { display: grid; align-items: center; justify-items: center; }
+#bar .icon.button { transition: background .25s; }
+#bar .icon.button:hover { background: #fff4; }
 
 body[data-show='theater'] .show-if-log,
 body:not([data-show='theater']) .show-if-theater,
@@ -156,9 +160,9 @@ body:not(.theater-locked) .show-if-theater-locked,
 body.droppeddown .hide-if-droppeddown,
 body:not(.droppeddown) .show-if-droppeddown { display: none !important; }
 
-#header > .bar > .hamburger { display: grid; grid-template-rows: 2px 2px 2px; grid-template-columns: 18px; grid-gap: 3px; align-content: center; justify-content: center; }
-#header > .bar > .hamburger > * { background: #fffb; border-radius: 1px; }
-body.droppeddown #header > .bar > .hamburger { background: #fff4; }
+#bar > .hamburger { display: grid; grid-template-rows: 2px 2px 2px; grid-template-columns: 18px; grid-gap: 3px; align-content: center; justify-content: center; }
+#bar > .hamburger > * { background: #fffb; border-radius: 1px; }
+body.droppeddown #bar > .hamburger { background: #fff4; }
 
 .dropdown-catchall { display: none; }
 body.droppeddown .dropdown-catchall { display: block; position: fixed; top: 0px; left: 0px; right: 0px; bottom: 0px; background: #0004; z-index: 1; }
@@ -167,15 +171,6 @@ body.droppeddown .dropdown-catchall { display: block; position: fixed; top: 0px;
 body.droppeddown #header > .dropdown { display: block; padding: 20px 10px; }
 #header > .dropdown .key_description { display: grid; grid-template-columns: max-content 1fr; align-items: center; grid-gap: 5px 10px; }
 #header > .dropdown .key_description .keys { display: inline-grid; justify-self: right; cursor: pointer; font-family: monospace; user-select: none; -moz-user-select: none; -webkit-user-select: none; border: 1px solid black; border-radius: 2px; height: 32px; align-items: center; padding: 0px 10px; }
-
-#header-bar-content > .log { display: grid; grid-template-columns: 1fr max-content; grid-template-rows: 48px; align-items: center; grid-gap: 8px; }
-#header-bar-content > .theater { display: grid; grid-template-columns: 1fr max-content; grid-template-rows: 48px; align-items: center; grid-gap: 8px; }
-body:not(.droppeddown) #header-bar-content > .droppeddown,
-body.droppeddown #header-bar-content > :not(.droppeddown) { display: none; }
-
-
-#log > .cmdline { list-style-position: inside; padding-left: 0px; margin-top: 0px; }
-#log > .cmdline .annotation { user-select: none; -moz-user-select: none; -webkit-user-select: none; color: gray; padding-left: 2ex; }
 
 #log .item, #log .context > .title { white-space: pre; padding-top: 5px; }
 
@@ -786,27 +781,19 @@ window.addEventListener('load', function() {
   _add_key_description('show-if-theater', ['Q'], 'Open the log at the current plot.', 'Q');
   _add_key_description('show-if-theater', ['ESC'], 'Go back.', 'Escape');
 
-  document.body.insertBefore(
-    create_element('div', {id: 'header'},
-      create_element('div', {'class': 'bar'},
-        // logo
-        create_element('p', {}, document.title),
-        // labels, only one is visible at a time
-        create_element('div', {'class': 'show-if-log hide-if-droppeddown label'}, (document.body.dataset.scriptname || '') + ' ' + (document.body.dataset.funcname || '')),
-        create_element('div', {id: 'theater-label', 'class': 'show-if-theater hide-if-droppeddown button label', title: 'exit theater and open log here', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater._open_log();}}}),
-        create_element('div', {'class': 'show-if-droppeddown label'}, 'keyboard shortcuts'),
-        // log level indicator, visible in log mode
-        create_element('div', {'class': 'show-if-log icon small-icon-container', id: 'log-level-indicator'}),
-        // category lock button, visible in theater mode
-        create_lock({'class': 'show-if-theater button icon lock', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater.toggle_locked(); }}}),
-        // hamburger
-        create_element('div', {'class': 'hamburger icon button', events: {click: ev => { document.body.classList.toggle('droppeddown'); ev.stopPropagation(); ev.preventDefault(); }}},
-          create_element('div'),
-          create_element('div'),
-          create_element('div'))),
-      create_element('div', {'class': 'dropdown', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); }}},
-        grid)),
-    document.getElementById('log'));
+  var bar = document.getElementById('bar');
+  // labels, only one is visible at a time
+  document.getElementById('text').appendChild(create_element('div', {id: 'theater-label', 'class': 'show-if-theater hide-if-droppeddown button label', title: 'exit theater and open log here', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater._open_log();}}}));
+  document.getElementById('text').appendChild(create_element('div', {'class': 'show-if-droppeddown label'}, 'keyboard shortcuts'));
+  // log level indicator, visible in log mode
+  bar.appendChild(create_element('div', {'class': 'show-if-log icon small-icon-container', id: 'log-level-indicator'}));
+  // category lock button, visible in theater mode
+  bar.appendChild(create_lock({'class': 'show-if-theater button icon lock', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); theater.toggle_locked(); }}}));
+  // hamburger
+  bar.appendChild(create_element('div', {'class': 'hamburger icon button', events: {click: ev => { document.body.classList.toggle('droppeddown'); ev.stopPropagation(); ev.preventDefault(); }}}, create_element('div'), create_element('div'), create_element('div')));
+
+  var header = document.getElementById('header');
+  header.appendChild(create_element('div', {'class': 'dropdown', events: {click: ev => { ev.stopPropagation(); ev.preventDefault(); }}}, grid));
 
   window.addEventListener('keydown', keydown_handler);
   window.addEventListener('popstate', ev => apply_state(ev.state || {}));
@@ -827,5 +814,11 @@ window.addEventListener('load', function() {
   state_control = 'enabled';
 });
 '''
+
+FAVICON = 'data:image/png;base64,' \
+  'iVBORw0KGgoAAAANSUhEUgAAANIAAADSAgMAAABC93bRAAAACVBMVEUAAGcAAAD////NzL25' \
+  'AAAAAXRSTlMAQObYZgAAAFtJREFUaN7t2SEOACEMRcEa7ofh/ldBsJJAS1bO86Ob/MZY9ViN' \
+  'TD0oiqIo6qrOURRFUVRepQ4TRVEURdXVV6MoiqKoV2UJpCiKov7+p1AURVFUWZWiKIqiqI2a' \
+  '8O8qJ0n+GP4AAAAASUVORK5CYII='
 
 # vim:sw=2:sts=2:et

@@ -193,27 +193,17 @@ class HtmlLog(Log):
       with self.assertSilent(), treelog.HtmlLog(tmpdir, title='test') as htmllog:
         yield htmllog
       self.assertEqual(htmllog.filename, 'log.html')
-      from treelog._html import CSS, JS
-      css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
-      js = hashlib.sha1(JS.encode()).hexdigest() + '.js'
-      self.assertEqual(set(os.listdir(tmpdir)), {'log.html', js, css, '616263.dat', '616263',
+      self.assertGreater(set(os.listdir(tmpdir)), {'log.html', '616263.dat', '616263',
         'b444ac06613fc8d63795be9ad0beaf55011936ac.dat', '109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat'})
       with open(os.path.join(tmpdir, 'log.html'), 'r') as f:
         lines = f.readlines()
-      self.assertEqual(lines, [
-        '<!DOCTYPE html>\n',
-        '<html>\n',
-        '<head>\n',
-        '<meta charset="UTF-8"/>\n',
-        '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"/>\n',
-        '<title>test</title>\n',
-        '<script src="{}"></script>\n'.format(js),
-        '<link rel="stylesheet" type="text/css" href="{}"/>\n'.format(css),
-        '</head>\n',
+      self.assertIn('<body>\n', lines)
+      self.assertEqual(lines[lines.index('<body>\n'):], [
         '<body>\n',
+        '<div id="header"><div id="bar"><div id="text"><div id="title">test</div></div></div></div>\n',
         '<div id="log">\n',
         '<div class="item" data-loglevel="2">my message</div>\n',
-        '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat" download="test.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
         '<div class="context"><div class="title">iter 0</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
@@ -229,12 +219,12 @@ class HtmlLog(Log):
         '<div class="context"><div class="title">test.dat</div><div class="children">\n',
         '<div class="item" data-loglevel="1">generating</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="item" data-loglevel="2"><a href="109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="2"><a href="109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="context"><div class="title">generate_id</div><div class="children">\n',
-        '<div class="item" data-loglevel="3"><a href="616263.dat">test.dat</a></div>\n',
+        '<div class="item" data-loglevel="3"><a href="616263.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="item" data-loglevel="4"><a href="616263">same</a></div>\n',
+        '<div class="item" data-loglevel="4"><a href="616263" download="same">same</a></div>\n',
         '</div></body></html>\n'])
       with open(os.path.join(tmpdir, 'b444ac06613fc8d63795be9ad0beaf55011936ac.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test1')
