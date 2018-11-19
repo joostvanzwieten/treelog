@@ -142,7 +142,7 @@ body[data-show='theater'] #header > .dropdown { background: hsla(140,46%,90%,0.9
 #bar, #header > .dropdown { transition: background .25s, border-bottom-color .25s; }
 
 #bar > *, #text > * { margin: 0px 4px; }
-#text { display: flex; flex-direction: row; align-items: center; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#text { display: flex; flex-direction: row; align-items: baseline; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #text :first-child { margin-left: 0px; }
 #text :last-child { margin-right: 0px; }
 #title { font-weight: bold; }
