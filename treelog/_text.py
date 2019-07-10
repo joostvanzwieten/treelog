@@ -62,9 +62,9 @@ class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
 
   class Thread:
-    def __init__(self, context, interval):
+    def __init__(self, interval):
       import _thread
-      self._context = context
+      self._context = ''
       self._alive = True
       self._uptodate = True
       self._lock = _thread.allocate_lock() # to be acquired by run, released by main thread
@@ -76,12 +76,14 @@ class RichOutputLog(ContextLog):
       self._alive = False
       self._uptodate = False
       self.release_lock()
-    def signal_contextchange(self):
-      if self._uptodate:
-        self._uptodate = False
-        self.release_lock()
+    def update_context(self, context):
+      if context != self._context:
+        self._context = context
+        if self._uptodate:
+          self._uptodate = False
+          self.release_lock()
     def print_context(self):
-      sys.stdout.write('\033[K\033[1;30m' + ' · '.join(self._context) + '\033[0m\r' if self._context else '\033[K\r')
+      sys.stdout.write('\033[K' + self._context + '\r')
       self._uptodate = True
     def run(self, interval):
       try:
@@ -95,10 +97,10 @@ class RichOutputLog(ContextLog):
   def __init__(self, interval=.1):
     super().__init__()
     _io.set_ansi_console()
-    self._thread = self.Thread(self.currentcontext, interval)
+    self._thread = self.Thread(interval)
 
   def contextchangedhook(self):
-    self._thread.signal_contextchange()
+    self._thread.update_context('\033[1;30m' + ' · '.join(self.currentcontext) + '\033[0m' if self.currentcontext else '')
 
   def write(self, text, level):
     line = '\033[K' # clear line
