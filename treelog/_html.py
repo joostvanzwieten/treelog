@@ -27,7 +27,7 @@ class HtmlLog(_base.Log):
   def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None, favicon=None):
     self._dir = _io.directory(dirpath)
     for self.filename in _io.sequence(filename):
-      self._file = self._dir.open(self.filename, 'w')
+      self._file = self._dir.open(self.filename, 'w', encoding='utf-8')
       if self._file:
         break
     css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
