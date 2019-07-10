@@ -43,6 +43,10 @@ class ContextLog(_base.Log):
     self.currentcontext.pop()
     self.contextchangedhook()
 
+  def replacecontext(self, title):
+    self.currentcontext[-1] = title
+    self.contextchangedhook()
+
   def contextchangedhook(self):
     pass
 

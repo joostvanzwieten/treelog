@@ -35,6 +35,10 @@ class Log(abc.ABC):
   def popcontext(self):
     raise NotImplementedError
 
+  def replacecontext(self, title):
+    self.popcontext()
+    self.pushcontext(title)
+
   @abc.abstractmethod
   def write(self, text, level):
     raise NotImplementedError
