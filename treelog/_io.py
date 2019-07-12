@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, hashlib, tempfile as _tempfile
+import io, os, contextlib, random, hashlib, tempfile as _tempfile, functools
 
 virtual_filename_prefix = '<treelog>' + os.sep
 supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink, os.mkdir}
@@ -39,9 +39,9 @@ class directory:
   def _join(self, name):
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename, mode, *, name=None, umask=0o666):
+  def open(self, filename, mode, *, encoding=None, name=None, umask=0o666):
     if mode == 'w' or mode == 'w+':
-      wrapper = io.TextIOWrapper
+      wrapper = functools.partial(io.TextIOWrapper, encoding=encoding)
     elif mode == 'wb':
       wrapper = io.BufferedWriter
     elif mode == 'wb+':
