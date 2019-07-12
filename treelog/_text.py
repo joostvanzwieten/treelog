@@ -25,21 +25,30 @@ class ContextLog(_base.Log):
   '''Base class for loggers that keep track of the current list of contexts.
 
   The base class implements :meth:`context` and :meth:`open` which keep the
-  attribute :attr:`_context` up-to-date.
+  attribute :attr:`currentcontext` up-to-date.
 
-  .. attribute:: _context
+  .. attribute:: currentcontext
 
      A :class:`list` of contexts (:class:`str`\\s) that are currently active.
   '''
 
   def __init__(self):
-    self._context = []
+    self.currentcontext = []
 
   def pushcontext(self, title):
-    self._context.append(title)
+    self.currentcontext.append(title)
+    self.contextchangedhook()
 
   def popcontext(self):
-    self._context.pop()
+    self.currentcontext.pop()
+    self.contextchangedhook()
+
+  def replacecontext(self, title):
+    self.currentcontext[-1] = title
+    self.contextchangedhook()
+
+  def contextchangedhook(self):
+    pass
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
@@ -51,15 +60,15 @@ class StdoutLog(ContextLog):
   '''Output plain text to stream.'''
 
   def write(self, text, level):
-    print(*self._context, text, sep=' > ')
+    print(*self.currentcontext, text, sep=' > ')
 
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
 
   class Thread:
-    def __init__(self, context, interval):
+    def __init__(self, interval):
       import _thread
-      self._context = context
+      self._context = ''
       self._alive = True
       self._uptodate = True
       self._lock = _thread.allocate_lock() # to be acquired by run, released by main thread
@@ -71,12 +80,14 @@ class RichOutputLog(ContextLog):
       self._alive = False
       self._uptodate = False
       self.release_lock()
-    def signal_contextchange(self):
-      if self._uptodate:
-        self._uptodate = False
-        self.release_lock()
+    def update_context(self, context):
+      if context != self._context:
+        self._context = context
+        if self._uptodate:
+          self._uptodate = False
+          self.release_lock()
     def print_context(self):
-      sys.stdout.write('\033[K\033[1;30m' + ' · '.join(self._context) + '\033[0m\r' if self._context else '\033[K\r')
+      sys.stdout.write('\033[K' + self._context + '\r')
       self._uptodate = True
     def run(self, interval):
       try:
@@ -90,27 +101,22 @@ class RichOutputLog(ContextLog):
   def __init__(self, interval=.1):
     super().__init__()
     _io.set_ansi_console()
-    self._thread = self.Thread(self._context, interval)
+    self._thread = self.Thread(interval)
 
-  def pushcontext(self, title):
-    super().pushcontext(title)
-    self._thread.signal_contextchange()
-
-  def popcontext(self):
-    super().popcontext()
-    self._thread.signal_contextchange()
+  def contextchangedhook(self):
+    self._thread.update_context('\033[1;30m' + ' · '.join(self.currentcontext) + '\033[0m' if self.currentcontext else '')
 
   def write(self, text, level):
     line = '\033[K' # clear line
-    if self._context:
-      line += '\033[1;30m' + ' · '.join(self._context) + ' · ' # context in gray
+    if self.currentcontext:
+      line += '\033[1;30m' + ' · '.join(self.currentcontext) + ' · ' # context in gray
     if level == 4: # error
       line += '\033[1;31m' # bold red
     elif level == 3: # warning
       line += '\033[0;31m' # red
     elif level == 2: # user
       line += '\033[1;34m' # bold blue
-    elif self._context:
+    elif self.currentcontext:
       line += '\033[0m' # reset color
     line += text
     line += '\033[0m\n' # reset and newline
@@ -132,4 +138,4 @@ class LoggingLog(ContextLog):
     super().__init__()
 
   def write(self, text, level):
-    self._logger.log(self._levels[level], ' > '.join((*self._context, text)))
+    self._logger.log(self._levels[level], ' > '.join((*self.currentcontext, text)))

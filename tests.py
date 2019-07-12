@@ -38,9 +38,10 @@ class Log(unittest.TestCase):
     treelog.user('my message')
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
-    with treelog.context('my context'):
-      for i, c in enumerate('abc'):
-        with treelog.context('iter', i):
+    with treelog.context('my', 'context'):
+      with treelog.context('iter ...'):
+        for i, c in enumerate('abc'):
+          treelog.replacecontext('iter {}'.format(i))
           treelog.info(c)
       with treelog.context('empty'):
         pass
