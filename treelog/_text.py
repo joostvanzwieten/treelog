@@ -25,21 +25,21 @@ class ContextLog(_base.Log):
   '''Base class for loggers that keep track of the current list of contexts.
 
   The base class implements :meth:`context` and :meth:`open` which keep the
-  attribute :attr:`_context` up-to-date.
+  attribute :attr:`currentcontext` up-to-date.
 
-  .. attribute:: _context
+  .. attribute:: currentcontext
 
      A :class:`list` of contexts (:class:`str`\\s) that are currently active.
   '''
 
   def __init__(self):
-    self._context = []
+    self.currentcontext = []
 
   def pushcontext(self, title):
-    self._context.append(title)
+    self.currentcontext.append(title)
 
   def popcontext(self):
-    self._context.pop()
+    self.currentcontext.pop()
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
@@ -51,7 +51,7 @@ class StdoutLog(ContextLog):
   '''Output plain text to stream.'''
 
   def write(self, text, level):
-    print(*self._context, text, sep=' > ')
+    print(*self.currentcontext, text, sep=' > ')
 
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
@@ -90,7 +90,7 @@ class RichOutputLog(ContextLog):
   def __init__(self, interval=.1):
     super().__init__()
     _io.set_ansi_console()
-    self._thread = self.Thread(self._context, interval)
+    self._thread = self.Thread(self.currentcontext, interval)
 
   def pushcontext(self, title):
     super().pushcontext(title)
@@ -102,15 +102,15 @@ class RichOutputLog(ContextLog):
 
   def write(self, text, level):
     line = '\033[K' # clear line
-    if self._context:
-      line += '\033[1;30m' + ' · '.join(self._context) + ' · ' # context in gray
+    if self.currentcontext:
+      line += '\033[1;30m' + ' · '.join(self.currentcontext) + ' · ' # context in gray
     if level == 4: # error
       line += '\033[1;31m' # bold red
     elif level == 3: # warning
       line += '\033[0;31m' # red
     elif level == 2: # user
       line += '\033[1;34m' # bold blue
-    elif self._context:
+    elif self.currentcontext:
       line += '\033[0m' # reset color
     line += text
     line += '\033[0m\n' # reset and newline
@@ -132,4 +132,4 @@ class LoggingLog(ContextLog):
     super().__init__()
 
   def write(self, text, level):
-    self._logger.log(self._levels[level], ' > '.join((*self._context, text)))
+    self._logger.log(self._levels[level], ' > '.join((*self.currentcontext, text)))
