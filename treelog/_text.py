@@ -37,9 +37,14 @@ class ContextLog(_base.Log):
 
   def pushcontext(self, title):
     self.currentcontext.append(title)
+    self.contextchangedhook()
 
   def popcontext(self):
     self.currentcontext.pop()
+    self.contextchangedhook()
+
+  def contextchangedhook(self):
+    pass
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
@@ -92,12 +97,7 @@ class RichOutputLog(ContextLog):
     _io.set_ansi_console()
     self._thread = self.Thread(self.currentcontext, interval)
 
-  def pushcontext(self, title):
-    super().pushcontext(title)
-    self._thread.signal_contextchange()
-
-  def popcontext(self):
-    super().popcontext()
+  def contextchangedhook(self):
     self._thread.signal_contextchange()
 
   def write(self, text, level):
