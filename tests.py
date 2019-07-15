@@ -39,7 +39,7 @@ class Log(unittest.TestCase):
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
     with treelog.context('my', 'context'):
-      with treelog.context('iter ...'):
+      with treelog.context('iter'):
         for i, c in enumerate('abc'):
           treelog.replacecontext('iter {}'.format(i))
           treelog.info(c)
@@ -81,50 +81,37 @@ class RichOutputLog(Log):
   @contextlib.contextmanager
   def output_tester(self):
     with capture() as writes:
-      yield treelog.RichOutputLog(interval=99)
+      yield treelog.RichOutputLog()
     self.assertEqual(writes, [
-      '\x1b[K\x1b[1;34mmy message\x1b[0m\n',
-      '\x1b[K\r',
-      '\x1b[Ktest.dat\x1b[0m\n',
-      '\x1b[K\r',
-      '\x1b[K\x1b[1;30mmy context · iter 0 · \x1b[0ma\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 0\x1b[0m\r',
-      '\x1b[K\x1b[1;30mmy context · iter 1 · \x1b[0mb\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 1\x1b[0m\r',
-      '\x1b[K\x1b[1;30mmy context · iter 2 · \x1b[0mc\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · iter 2\x1b[0m\r',
-      '\x1b[K\x1b[1;30mmy context · \x1b[1;31mmultiple..\n  ..lines\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context\x1b[0m\r',
-      '\x1b[K\x1b[1;30mmy context · test.dat · \x1b[0mgenerating\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context · test.dat\x1b[0m\r',
-      '\x1b[K\x1b[1;30mmy context · \x1b[1;34mtest.dat\x1b[0m\n',
-      '\x1b[K\x1b[1;30mmy context\x1b[0m\r',
-      '\x1b[K\x1b[1;30mgenerate_id · \x1b[0;31mtest.dat\x1b[0m\n',
-      '\x1b[K\x1b[1;30mgenerate_id\x1b[0m\r',
-      '\x1b[K\x1b[1;31msame\x1b[0m\n',
-      '\x1b[K\r'])
-
-  def test_thread(self):
-    import _thread
-    lock = _thread.allocate_lock()
-    interval = .1
-    with waitable_capture(lock) as writes:
-      log = treelog.RichOutputLog(interval=interval)
-      lock.acquire(0)
-      with log.context('A'):
-        self.assertTrue(lock.acquire(timeout=interval*10), 'timed out')
-      log.info('B')
-      lock.acquire(0)
-      with log.context('C'):
-        with log.context('D'):
-          with log.context('E'):
-            pass
-          self.assertTrue(lock.acquire(timeout=interval*10), 'timed out')
-    self.assertEqual(writes, [
-      '\x1b[K\x1b[1;30mA\x1b[0m\r',
-      '\x1b[KB\x1b[0m\n',
-      '\x1b[K\r',
-      '\x1b[K\x1b[1;30mC · D\x1b[0m\r'])
+      '\x1b[1;34mmy message\n\x1b[0m',
+      '\r\x1b[1;30mtest.dat > \x1b[0m',
+      '\r\x1b[K',
+      'test.dat\n\x1b[0m',
+      '\r\x1b[1;30mmy context > \x1b[0m',
+      '\x1b[1;30miter > \x1b[0m',
+      '\x1b[2D\x1b[1;30m0 > \x1b[0m',
+      'a\n\x1b[1;30mmy context > iter 0 > \x1b[0m',
+      '\x1b[4D\x1b[1;30m1 > \x1b[0m',
+      'b\n\x1b[1;30mmy context > iter 1 > \x1b[0m',
+      '\x1b[4D\x1b[1;30m2 > \x1b[0m',
+      'c\n\x1b[1;30mmy context > iter 2 > \x1b[0m',
+      '\x1b[9D\x1b[K',
+      '\x1b[1;30mempty > \x1b[0m',
+      '\x1b[8D\x1b[K',
+      '\x1b[1;31mmultiple..\n  ..lines\n\x1b[1;30mmy context > \x1b[0m',
+      '\x1b[1;30mtest.dat > \x1b[0m',
+      'generating\n\x1b[1;30mmy context > test.dat > \x1b[0m',
+      '\x1b[11D\x1b[K',
+      '\x1b[1;34mtest.dat\n\x1b[1;30mmy context > \x1b[0m',
+      '\r\x1b[K',
+      '\r\x1b[1;30mgenerate_id > \x1b[0m',
+      '\x1b[1;30mtest.dat > \x1b[0m',
+      '\x1b[11D\x1b[K',
+      '\x1b[0;31mtest.dat\n\x1b[1;30mgenerate_id > \x1b[0m',
+      '\r\x1b[K',
+      '\r\x1b[1;30msame > \x1b[0m',
+      '\r\x1b[K',
+      '\x1b[1;31msame\n\x1b[0m'])
 
 class DataLog(Log):
 
@@ -295,7 +282,7 @@ class RecordLog(Log):
       ('popcontext',),
       ('open', 3, 'same', 'wb', 4, b'abc'),
       ('close', 3, b'test3')])
-    for Log in StdoutLog, RichOutputLog, DataLog, HtmlLog:
+    for Log in StdoutLog, DataLog, HtmlLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
 
@@ -415,22 +402,13 @@ del Log # hide from unittest discovery
 class write:
   def __init__(self, write):
     self.write = write
+  def flush(self):
+    pass
 
 @contextlib.contextmanager
 def capture():
   writes = []
   with contextlib.redirect_stdout(write(writes.append)):
-    yield writes
-
-@contextlib.contextmanager
-def waitable_capture(lock):
-  writes = []
-  @write
-  def release_and_append(text):
-    if lock.locked():
-      lock.release()
-    writes.append(text)
-  with contextlib.redirect_stdout(release_and_append):
     yield writes
 
 @write
