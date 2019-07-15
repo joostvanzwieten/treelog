@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, sys, os, urllib.parse, html, hashlib
+import contextlib, sys, os, urllib.parse, html, hashlib, warnings
 from . import _base, _io
 
 class HtmlLog(_base.Log):

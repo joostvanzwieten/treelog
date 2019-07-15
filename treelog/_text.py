@@ -65,68 +65,43 @@ class StdoutLog(ContextLog):
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
 
-  class Thread:
-    def __init__(self, interval):
-      import _thread
-      self._context = ''
-      self._alive = True
-      self._uptodate = True
-      self._lock = _thread.allocate_lock() # to be acquired by run, released by main thread
-      _thread.start_new_thread(self.run, (interval,))
-    def release_lock(self):
-      if self._lock.locked():
-        self._lock.release()
-    def signal_stop(self):
-      self._alive = False
-      self._uptodate = False
-      self.release_lock()
-    def update_context(self, context):
-      if context != self._context:
-        self._context = context
-        if self._uptodate:
-          self._uptodate = False
-          self.release_lock()
-    def print_context(self):
-      sys.stdout.write('\033[K' + self._context + '\r')
-      self._uptodate = True
-    def run(self, interval):
-      try:
-        while self._alive:
-          if not self._lock.acquire(timeout=-1 if self._uptodate else interval):
-            # acquire timed out, implies _uptodate == False
-            self.print_context()
-      except Exception as e:
-        sys.stdout.write('\033[Kcontext thread died unexpectedly: {}\n'.format(e))
-
-  def __init__(self, interval=.1):
+  def __init__(self):
     super().__init__()
+    self._current = '' # currently printed context
     _io.set_ansi_console()
-    self._thread = self.Thread(interval)
 
   def contextchangedhook(self):
-    self._thread.update_context('\033[1;30m' + ' · '.join(self.currentcontext) + '\033[0m' if self.currentcontext else '')
+    _current = ''.join(item + ' > ' for item in self.currentcontext)
+    if _current == self._current:
+      return
+    n = _first(c1 != c2 for c1, c2 in zip(_current, self._current))
+    items = []
+    if n == 0:
+      items.append('\r')
+    elif n < len(self._current):
+      items.append('\033[{}D'.format(len(self._current)-n))
+    if n < len(_current):
+      items.extend(['\033[1;30m', _current[n:], '\033[0m'])
+    if len(_current) < len(self._current):
+      items.append('\033[K')
+    sys.stdout.write(''.join(items))
+    if n:
+      sys.stdout.flush()
+    self._current = _current
 
   def write(self, text, level):
-    line = '\033[K' # clear line
-    if self.currentcontext:
-      line += '\033[1;30m' + ' · '.join(self.currentcontext) + ' · ' # context in gray
+    items = []
     if level == 4: # error
-      line += '\033[1;31m' # bold red
+      items.append('\033[1;31m') # bold red
     elif level == 3: # warning
-      line += '\033[0;31m' # red
+      items.append('\033[0;31m') # red
     elif level == 2: # user
-      line += '\033[1;34m' # bold blue
-    elif self.currentcontext:
-      line += '\033[0m' # reset color
-    line += text
-    line += '\033[0m\n' # reset and newline
-    sys.stdout.write(line)
-    self._thread.print_context()
-    self._thread.release_lock()
-
-  def __del__(self):
-    if hasattr(self, '_thread'):
-      self._thread.signal_stop()
+      items.append('\033[1;34m') # bold blue
+    items.extend([text, '\n'])
+    if self.currentcontext:
+      items.extend(['\033[1;30m', self._current])
+    items.append('\033[0m')
+    sys.stdout.write(''.join(items))
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
@@ -139,3 +114,12 @@ class LoggingLog(ContextLog):
 
   def write(self, text, level):
     self._logger.log(self._levels[level], ' > '.join((*self.currentcontext, text)))
+
+def _first(items):
+  'return index of first truthy item, or len(items) of all items are falsy'
+  i = 0
+  for item in items:
+    if item:
+      break
+    i += 1
+  return i
