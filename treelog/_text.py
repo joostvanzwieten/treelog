@@ -65,6 +65,13 @@ class StdoutLog(ContextLog):
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
 
+  _cmap = (
+    '\033[1;30m', # debug: bold gray
+    '\033[1m', # info: bold
+    '\033[1;34m', # user: bold blue
+    '\033[1;35m', # warning: bold purple
+    '\033[1;31m') # error: bold red
+
   def __init__(self):
     super().__init__()
     self._current = '' # currently printed context
@@ -81,7 +88,7 @@ class RichOutputLog(ContextLog):
     elif n < len(self._current):
       items.append('\033[{}D'.format(len(self._current)-n))
     if n < len(_current):
-      items.extend(['\033[1;30m', _current[n:], '\033[0m'])
+      items.append(_current[n:])
     if len(_current) < len(self._current):
       items.append('\033[K')
     sys.stdout.write(''.join(items))
@@ -89,18 +96,7 @@ class RichOutputLog(ContextLog):
     self._current = _current
 
   def write(self, text, level):
-    items = []
-    if level == 4: # error
-      items.append('\033[1;31m') # bold red
-    elif level == 3: # warning
-      items.append('\033[0;31m') # red
-    elif level == 2: # user
-      items.append('\033[1;34m') # bold blue
-    items.extend([text, '\n'])
-    if self.currentcontext:
-      items.extend(['\033[1;30m', self._current])
-    items.append('\033[0m')
-    sys.stdout.write(''.join(items))
+    sys.stdout.write(''.join([self._cmap[level], text, '\033[0m\n', self._current]))
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
