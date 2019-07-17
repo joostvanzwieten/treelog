@@ -84,10 +84,10 @@ class RichOutputLog(Log):
       yield treelog.RichOutputLog()
     self.assertEqual(writes, [
       '\x1b[1;34mmy message\n\x1b[0m',
-      '\r\x1b[1;30mtest.dat > \x1b[0m',
+      '\x1b[1;30mtest.dat > \x1b[0m',
       '\r\x1b[K',
       'test.dat\n\x1b[0m',
-      '\r\x1b[1;30mmy context > \x1b[0m',
+      '\x1b[1;30mmy context > \x1b[0m',
       '\x1b[1;30miter > \x1b[0m',
       '\x1b[2D\x1b[1;30m0 > \x1b[0m',
       'a\n\x1b[1;30mmy context > iter 0 > \x1b[0m',
@@ -104,12 +104,12 @@ class RichOutputLog(Log):
       '\x1b[11D\x1b[K',
       '\x1b[1;34mtest.dat\n\x1b[1;30mmy context > \x1b[0m',
       '\r\x1b[K',
-      '\r\x1b[1;30mgenerate_id > \x1b[0m',
+      '\x1b[1;30mgenerate_id > \x1b[0m',
       '\x1b[1;30mtest.dat > \x1b[0m',
       '\x1b[11D\x1b[K',
       '\x1b[0;31mtest.dat\n\x1b[1;30mgenerate_id > \x1b[0m',
       '\r\x1b[K',
-      '\r\x1b[1;30msame > \x1b[0m',
+      '\x1b[1;30msame > \x1b[0m',
       '\r\x1b[K',
       '\x1b[1;31msame\n\x1b[0m'])
 

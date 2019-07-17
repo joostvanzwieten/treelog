@@ -76,7 +76,7 @@ class RichOutputLog(ContextLog):
       return
     n = _first(c1 != c2 for c1, c2 in zip(_current, self._current))
     items = []
-    if n == 0:
+    if n == 0 and self._current:
       items.append('\r')
     elif n < len(self._current):
       items.append('\033[{}D'.format(len(self._current)-n))
@@ -85,8 +85,7 @@ class RichOutputLog(ContextLog):
     if len(_current) < len(self._current):
       items.append('\033[K')
     sys.stdout.write(''.join(items))
-    if n:
-      sys.stdout.flush()
+    sys.stdout.flush()
     self._current = _current
 
   def write(self, text, level):
