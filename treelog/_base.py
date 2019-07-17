@@ -35,7 +35,7 @@ class Log(abc.ABC):
   def popcontext(self):
     raise NotImplementedError
 
-  def replacecontext(self, title):
+  def recontext(self, title):
     self.popcontext()
     self.pushcontext(title)
 

@@ -41,7 +41,7 @@ class Log(unittest.TestCase):
     with treelog.context('my', 'context'):
       with treelog.context('iter'):
         for i, c in enumerate('abc'):
-          treelog.replacecontext('iter {}'.format(i))
+          treelog.recontext('iter {}'.format(i))
           treelog.info(c)
       with treelog.context('empty'):
         pass

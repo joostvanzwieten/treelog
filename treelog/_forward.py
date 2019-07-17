@@ -36,9 +36,9 @@ class TeeLog(_base.Log):
     self._baselog1.popcontext()
     self._baselog2.popcontext()
 
-  def replacecontext(self, title):
-    self._baselog1.replacecontext(title)
-    self._baselog2.replacecontext(title)
+  def recontext(self, title):
+    self._baselog1.recontext(title)
+    self._baselog2.recontext(title)
 
   def write(self, text, level):
     self._baselog1.write(text, level)
@@ -80,8 +80,8 @@ class FilterLog(_base.Log):
   def popcontext(self):
     self._baselog.popcontext()
 
-  def replacecontext(self, title):
-    self._baselog.replacecontext(title)
+  def recontext(self, title):
+    self._baselog.recontext(title)
 
   def write(self, text, level):
     if level >= self._minlevel:
