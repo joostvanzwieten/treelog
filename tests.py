@@ -255,21 +255,24 @@ class RecordLog(Log):
 
   @contextlib.contextmanager
   def output_tester(self):
-    recordlog = treelog.RecordLog()
+    recordlog = treelog.RecordLog(simplify=False)
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
       ('open', 0, 'test.dat', 'wb', 1, None),
+      ('pushcontext', 'test.dat'),
+      ('popcontext',),
       ('close', 0, b'test1'),
       ('pushcontext', 'my context'),
-      ('pushcontext', 'iter 0'),
+      ('pushcontext', 'iter'),
+      ('recontext', 'iter 0'),
       ('write', 'a', 1),
-      ('popcontext',),
-      ('pushcontext', 'iter 1'),
+      ('recontext', 'iter 1'),
       ('write', 'b', 1),
-      ('popcontext',),
-      ('pushcontext', 'iter 2'),
+      ('recontext', 'iter 2'),
       ('write', 'c', 1),
+      ('popcontext',),
+      ('pushcontext', 'empty'),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
       ('open', 1, 'test.dat', 'wb+', 2, None),
@@ -279,6 +282,50 @@ class RecordLog(Log):
       ('close', 1, b'test2'),
       ('popcontext',),
       ('pushcontext', 'generate_id'),
+      ('open', 2, 'test.dat', 'wb', 3, b'abc'),
+      ('pushcontext', 'test.dat'),
+      ('popcontext',),
+      ('close', 2, b'test3'),
+      ('popcontext',),
+      ('open', 3, 'same', 'wb', 4, b'abc'),
+      ('pushcontext', 'same'),
+      ('popcontext',),
+      ('close', 3, b'test3')])
+    for Log in StdoutLog, DataLog, HtmlLog, RichOutputLog:
+      with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
+        recordlog.replay(log)
+
+  def test_replay_in_current(self):
+    recordlog = treelog.RecordLog()
+    recordlog.write('test', level=1)
+    with self.assertSilent(), treelog.set(treelog.LoggingLog()), self.assertLogs('nutils'):
+      recordlog.replay()
+
+class SimplifiedRecordLog(Log):
+
+  @contextlib.contextmanager
+  def output_tester(self):
+    recordlog = treelog.RecordLog(simplify=True)
+    yield recordlog
+    self.assertEqual(recordlog._messages, [
+      ('write', 'my message', 2),
+      ('open', 0, 'test.dat', 'wb', 1, None),
+      ('close', 0, b'test1'),
+      ('pushcontext', 'my context'),
+      ('pushcontext', 'iter 0'),
+      ('write', 'a', 1),
+      ('recontext', 'iter 1'),
+      ('write', 'b', 1),
+      ('recontext', 'iter 2'),
+      ('write', 'c', 1),
+      ('popcontext',),
+      ('write', 'multiple..\n  ..lines', 4),
+      ('open', 1, 'test.dat', 'wb+', 2, None),
+      ('pushcontext', 'test.dat'),
+      ('write', 'generating', 1),
+      ('popcontext',),
+      ('close', 1, b'test2'),
+      ('recontext', 'generate_id'),
       ('open', 2, 'test.dat', 'wb', 3, b'abc'),
       ('close', 2, b'test3'),
       ('popcontext',),
@@ -360,8 +407,7 @@ class FilterLog(Log):
       ('write', 'multiple..\n  ..lines', 4),
       ('open', 0, 'test.dat', 'wb+', 2, None),
       ('close', 0, b'test2'),
-      ('popcontext',),
-      ('pushcontext', 'generate_id'),
+      ('recontext', 'generate_id'),
       ('open', 1, 'test.dat', 'wb', 3, b'abc'),
       ('close', 1, b'test3'),
       ('popcontext',),
