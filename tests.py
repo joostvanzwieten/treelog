@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io
+import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io, warnings, gc
 
 class Log(unittest.TestCase):
 
@@ -39,9 +39,8 @@ class Log(unittest.TestCase):
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
     with treelog.context('my context'):
-      with treelog.context('iter {}', 0) as reformat:
-        for i, c in enumerate('abc'):
-          reformat(i+1)
+      with treelog.iter.plain('iter', 'abc') as items:
+        for c in items:
           treelog.info(c)
       with treelog.context('empty'):
         pass
@@ -442,6 +441,136 @@ class NullLog(Log):
   def test_disable(self):
     with treelog.disable():
       self.assertIsInstance(treelog.current, treelog.NullLog)
+
+class Iter(unittest.TestCase):
+
+  def setUp(self):
+    self.recordlog = treelog.RecordLog(simplify=False)
+    self.previous = treelog.current
+    treelog.current = self.recordlog
+
+  def tearDown(self):
+    treelog.current = self.previous
+
+  def assertMessages(self, *msg):
+    self.assertEqual(self.recordlog._messages, list(msg))
+
+  def test_context(self):
+    with treelog.iter.plain('test', enumerate('abc')) as myiter:
+      for i, c in myiter:
+        self.assertEqual(c, 'abc'[i])
+        treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 2'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 3'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_nocontext(self):
+    for i, c in treelog.iter.plain('test', enumerate('abc')):
+      self.assertEqual(c, 'abc'[i])
+      treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 2'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 3'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_break_entered(self):
+    with warnings.catch_warnings(record=True) as w, treelog.iter.plain('test', [1,2,3]) as myiter:
+      for item in myiter:
+        self.assertEqual(item, 1)
+        treelog.info('hi')
+        break
+      gc.collect()
+    self.assertEqual(w, [])
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_break_notentered(self):
+    with self.assertWarns(ResourceWarning):
+      for item in treelog.iter.plain('test', [1,2,3]):
+        self.assertEqual(item, 1)
+        treelog.info('hi')
+        break
+      gc.collect()
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_multiple(self):
+    with treelog.iter.plain('test', 'abc', [1,2]) as items:
+      self.assertEqual(list(items), [('a',1),('b',2)])
+
+  def test_plain(self):
+    with treelog.iter.plain('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('recontext', 'test 2'),
+      ('recontext', 'test 3'),
+      ('popcontext',))
+
+  def test_plain_withbraces(self):
+    with treelog.iter.plain('t{es}t', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 't{es}t 0'),
+      ('recontext', 't{es}t 1'),
+      ('recontext', 't{es}t 2'),
+      ('recontext', 't{es}t 3'),
+      ('popcontext',))
+
+  def test_fraction(self):
+    with treelog.iter.fraction('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0/3'),
+      ('recontext', 'test 1/3'),
+      ('recontext', 'test 2/3'),
+      ('recontext', 'test 3/3'),
+      ('popcontext',))
+
+  def test_percentage(self):
+    with treelog.iter.percentage('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0%'),
+      ('recontext', 'test 33%'),
+      ('recontext', 'test 67%'),
+      ('recontext', 'test 100%'),
+      ('popcontext',))
+
+  def test_send(self):
+    def titles():
+      a = yield 'value'
+      while True:
+        a = yield 'value={!r}'.format(a)
+    with treelog.iter.wrap(titles(), 'abc') as items:
+      for i, item in enumerate(items):
+        self.assertEqual(item, 'abc'[i])
+      treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'value'),
+      ('recontext', "value='a'"),
+      ('recontext', "value='b'"),
+      ('recontext', "value='c'"),
+      ('write', 'hi', 1),
+      ('popcontext',))
 
 del Log # hide from unittest discovery
 

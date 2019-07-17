@@ -22,6 +22,7 @@ version = '1.0b4'
 
 import sys, functools, contextlib
 
+from . import iter
 from ._base import Log
 from ._forward import TeeLog, FilterLog
 from ._silent import NullLog, DataLog, RecordLog
