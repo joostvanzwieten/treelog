@@ -52,7 +52,7 @@ class ContextLog(_base.Log):
 
   @contextlib.contextmanager
   def open(self, filename, mode, level, id):
-    with self.context(filename), _io.devnull(filename) as f:
+    with _io.devnull(filename) as f:
       yield f
     self.write(filename, level=level)
 

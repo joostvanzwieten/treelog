@@ -69,6 +69,7 @@ class Log(abc.ABC):
       '''
       self.write(sep.join(map(str, args)), level)
 
+    @contextlib.contextmanager
     def file(self, name, mode, *, id=None):
       '''Open file in logger-controlled directory.
 
@@ -81,7 +82,8 @@ class Log(abc.ABC):
           Bytes identifier that can be used to decide a priori that a file has
           already been constructed. Default: None.
       '''
-      return self.open(name, mode, level, id)
+      with self.open(name, mode, level, id) as f, self.context(name):
+        yield f
 
     name = ['debug', 'info', 'user', 'warning', 'error'][level]
     print.__name__ = name
