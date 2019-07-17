@@ -72,7 +72,7 @@ class HtmlLog(_base.Log):
         f = self._dir.open(fname, mode, name=filename)
       else:
         f, fname = self._dir.temp(mode, name=filename)
-      with self.context(filename), f:
+      with f:
         yield f
     except:
       if f:
