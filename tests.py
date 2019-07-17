@@ -41,7 +41,7 @@ class Log(unittest.TestCase):
     with treelog.context('my', 'context'):
       with treelog.context('iter'):
         for i, c in enumerate('abc'):
-          treelog.recontext('iter {}'.format(i))
+          treelog.current.recontext('iter {}'.format(i))
           treelog.info(c)
       with treelog.context('empty'):
         pass
@@ -140,7 +140,7 @@ class DataLog(Log):
       log = treelog.DataLog(outdira)
       os.rename(outdira, outdirb)
       os.mkdir(outdira)
-      with log.infofile('dat', 'wb') as f:
+      with log.open('dat', 'wb', level=1, id=None) as f:
         pass
       self.assertEqual(os.listdir(outdirb), ['dat'])
       self.assertEqual(os.listdir(outdira), [])
@@ -149,7 +149,7 @@ class DataLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir:
       log = treelog.DataLog(tmpdir)
       with self.assertRaises(RuntimeError):
-        with log.infofile('dat', 'wb') as f:
+        with log.open('dat', 'wb', level=1, id=None) as f:
           f.write(b'test')
           raise RuntimeError
       self.assertFalse(os.listdir(tmpdir))
@@ -158,7 +158,7 @@ class DataLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir:
       log = treelog.DataLog(tmpdir)
       with self.assertRaises(RuntimeError):
-        with log.infofile('dat', 'wb', id=b'abc') as f:
+        with log.open('dat', 'wb', level=1, id=b'abc') as f:
           f.write(b'test')
           raise RuntimeError
       self.assertEqual(os.listdir(tmpdir), ['.id'])
@@ -167,10 +167,10 @@ class DataLog(Log):
   def test_open_id(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       log = treelog.DataLog(tmpdir)
-      with log.infofile('dat1', 'wb', id=b'abc') as f:
+      with log.open('dat1', 'wb', level=1, id=b'abc') as f:
         pass
       self.assertEqual(os.listdir(os.path.join(tmpdir, '.id')), ['616263'])
-      with log.infofile('dat2', 'wb', id=b'abc') as f:
+      with log.open('dat2', 'wb', level=1, id=b'abc') as f:
         self.assertFalse(f)
 
 class HtmlLog(Log):
@@ -231,14 +231,14 @@ class HtmlLog(Log):
       with silent, treelog.HtmlLog(outdira) as log:
         os.rename(outdira, outdirb)
         os.mkdir(outdira)
-        with log.infofile('dat', 'wb') as f:
+        with log.open('dat', 'wb', level=1, id=None) as f:
           pass
       self.assertIn('da39a3ee5e6b4b0d3255bfef95601890afd80709', os.listdir(outdirb))
 
   def test_remove_on_failure(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       with silent, treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
-        with log.infofile('dat', 'wb') as f:
+        with log.open('dat', 'wb', level=1, id=None) as f:
           f.write(b'test')
           raise RuntimeError
       self.assertEqual(len(os.listdir(tmpdir)), 3)
@@ -246,7 +246,7 @@ class HtmlLog(Log):
   def test_remove_on_failure_id(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       with silent, treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
-        with log.infofile('dat', 'wb', id=b'abc') as f:
+        with log.open('dat', 'wb', level=1, id=b'abc') as f:
           f.write(b'test')
           raise RuntimeError
       self.assertEqual(len(os.listdir(tmpdir)), 3)
@@ -290,7 +290,7 @@ class RecordLog(Log):
 
   def test_replay_in_current(self):
     recordlog = treelog.RecordLog()
-    recordlog.info('test')
+    recordlog.write('test', level=1)
     with self.assertSilent(), treelog.set(treelog.LoggingLog()), self.assertLogs('nutils'):
       recordlog.replay()
 
@@ -305,13 +305,13 @@ class TeeLog(Log):
 
   def test_open_devnull_devnull(self):
     teelog = treelog.TeeLog(treelog.StdoutLog(), treelog.StdoutLog())
-    with silent, teelog.infofile('test', 'wb') as f:
+    with silent, teelog.open('test', 'wb', level=1, id=None) as f:
       self.assertFalse(f)
 
   def test_open_devnull_file(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       teelog = treelog.TeeLog(treelog.StdoutLog(), treelog.DataLog(tmpdir))
-      with silent, teelog.infofile('test', 'wb') as f:
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
@@ -320,7 +320,7 @@ class TeeLog(Log):
   def test_open_file_devnull(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       teelog = treelog.TeeLog(treelog.DataLog(tmpdir), treelog.StdoutLog())
-      with silent, teelog.infofile('test', 'wb') as f:
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIsInstance(f, io.BufferedWriter)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
@@ -329,7 +329,7 @@ class TeeLog(Log):
   def test_open_file_file(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       teelog = treelog.TeeLog(treelog.DataLog(tmpdir), treelog.DataLog(tmpdir))
-      with teelog.infofile('test', 'wb') as f:
+      with teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
@@ -341,7 +341,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir:
       recordlog = treelog.RecordLog()
       teelog = treelog.TeeLog(recordlog, treelog.DataLog(tmpdir))
-      with teelog.infofile('test', 'wb', id=b'abc') as f:
+      with teelog.open('test', 'wb', level=1, id=b'abc') as f:
         self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
       self.assertEqual(recordlog._seen[b'abc'], b'test')

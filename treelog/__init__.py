@@ -52,27 +52,54 @@ def disable():
 
   return set(NullLog())
 
+@contextlib.contextmanager
+def context(*args, sep=' '):
+  current.pushcontext(sep.join(map(str, args)))
+  try:
+    yield
+  finally:
+    current.popcontext()
+
 def withcontext(f):
   '''Decorator; executes the wrapped function in its own logging context.'''
 
   @functools.wraps(f)
   def wrapped(*args, **kwargs):
-    with current.context(f.__name__):
+    with context(f.__name__):
       return f(*args, **kwargs)
   return wrapped
 
-def __getattr__(name):
-  return getattr(current, name)
+def _print(level, *args, sep=' '):
+  '''Write message to log.
 
-if sys.version_info < (3,7):
-  def _factory(name):
-    def wrapper(*args, **kwargs):
-      return __getattr__(name)(*args, **kwargs)
-    wrapper.__doc__ = getattr(Log, name).__doc__
-    wrapper.__name__ = name
-    wrapper.__qualname__ = name
-    return wrapper
-  locals().update((name, _factory(name)) for name in dir(Log))
-  del _factory
+  Args
+  ----
+  *args : tuple of :class:`str`
+      Values to be printed to the log.
+  sep : :class:`str`
+      String inserted between values, default a space.
+  '''
+  current.write(sep.join(map(str, args)), level)
+
+@contextlib.contextmanager
+def _file(level, name, mode, *, id=None):
+  '''Open file in logger-controlled directory.
+
+  Args
+  ----
+  filename : :class:`str`
+  mode : :class:`str`
+      Should be either ``'w'`` (text) or ``'wb'`` (binary data).
+  id :
+      Bytes identifier that can be used to decide a priori that a file has
+      already been constructed. Default: None.
+  '''
+  with current.open(name, mode, level, id) as f, context(name):
+    yield f
+
+debug, info, user, warning, error = [functools.partial(_print, level) for level in range(5)]
+debugfile, infofile, userfile, warningfile, errorfile = [functools.partial(_file, level) for level in range(5)]
+
+del _print, _file
 
 # vim:sw=2:sts=2:et

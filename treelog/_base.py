@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import abc, contextlib
+import abc
 
 class Log(abc.ABC):
   '''Abstract base class for log objects.
@@ -46,58 +46,5 @@ class Log(abc.ABC):
   @abc.abstractmethod
   def open(self, filename, mode, level, id):
     raise NotImplementedError
-
-  @contextlib.contextmanager
-  def context(self, *args, sep=' '):
-    self.pushcontext(sep.join(map(str, args)))
-    try:
-      yield
-    finally:
-      self.popcontext()
-
-  def _factory(level):
-
-    def print(self, *args, sep=' '):
-      '''Write message to log.
-
-      Args
-      ----
-      *args : tuple of :class:`str`
-          Values to be printed to the log.
-      sep : :class:`str`
-          String inserted between values, default a space.
-      '''
-      self.write(sep.join(map(str, args)), level)
-
-    @contextlib.contextmanager
-    def file(self, name, mode, *, id=None):
-      '''Open file in logger-controlled directory.
-
-      Args
-      ----
-      filename : :class:`str`
-      mode : :class:`str`
-          Should be either ``'w'`` (text) or ``'wb'`` (binary data).
-      id :
-          Bytes identifier that can be used to decide a priori that a file has
-          already been constructed. Default: None.
-      '''
-      with self.open(name, mode, level, id) as f, self.context(name):
-        yield f
-
-    name = ['debug', 'info', 'user', 'warning', 'error'][level]
-    print.__name__ = name
-    print.__qualname__ = 'Log.' + name
-    file.__name__ = name + 'file'
-    file.__qualname__ = 'Log.' + name + 'file'
-    return print, file
-
-  debug,   debugfile   = _factory(0)
-  info,    infofile    = _factory(1)
-  user,    userfile    = _factory(2)
-  warning, warningfile = _factory(3)
-  error,   errorfile   = _factory(4)
-
-  del _factory
 
 # vim:sw=2:sts=2:et
