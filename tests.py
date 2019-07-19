@@ -38,10 +38,10 @@ class Log(unittest.TestCase):
     treelog.user('my message')
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
-    with treelog.context('my', 'context'):
-      with treelog.context('iter'):
+    with treelog.context('my context'):
+      with treelog.context('iter {}', 0) as reformat:
         for i, c in enumerate('abc'):
-          treelog.current.recontext('iter {}'.format(i))
+          reformat(i+1)
           treelog.info(c)
       with treelog.context('empty'):
         pass
@@ -66,9 +66,9 @@ class StdoutLog(Log):
     self.assertEqual(''.join(writes),
       'my message\n'
       'test.dat\n'
-      'my context > iter 0 > a\n'
-      'my context > iter 1 > b\n'
-      'my context > iter 2 > c\n'
+      'my context > iter 1 > a\n'
+      'my context > iter 2 > b\n'
+      'my context > iter 3 > c\n'
       'my context > multiple..\n'
       '  ..lines\n'
       'my context > test.dat > generating\n'
@@ -88,13 +88,13 @@ class RichOutputLog(Log):
       '\r\x1b[K',
       '\x1b[1mtest.dat\x1b[0m\n',
       'my context > ',
-      'iter > ',
-      '\x1b[2D0 > ',
-      '\x1b[1ma\x1b[0m\nmy context > iter 0 > ',
+      'iter 0 > ',
       '\x1b[4D1 > ',
-      '\x1b[1mb\x1b[0m\nmy context > iter 1 > ',
+      '\x1b[1ma\x1b[0m\nmy context > iter 1 > ',
       '\x1b[4D2 > ',
-      '\x1b[1mc\x1b[0m\nmy context > iter 2 > ',
+      '\x1b[1mb\x1b[0m\nmy context > iter 2 > ',
+      '\x1b[4D3 > ',
+      '\x1b[1mc\x1b[0m\nmy context > iter 3 > ',
       '\x1b[9D\x1b[K',
       'empty > ',
       '\x1b[8D\x1b[K',
@@ -193,13 +193,13 @@ class HtmlLog(Log):
         '<div class="item" data-loglevel="2">my message</div>\n',
         '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat" download="test.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
-        '<div class="context"><div class="title">iter 0</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
         '<div class="item" data-loglevel="1">b</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 3</div><div class="children">\n',
         '<div class="item" data-loglevel="1">c</div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4">multiple..\n',
@@ -264,12 +264,12 @@ class RecordLog(Log):
       ('popcontext',),
       ('close', 0, b'test1'),
       ('pushcontext', 'my context'),
-      ('pushcontext', 'iter'),
-      ('recontext', 'iter 0'),
-      ('write', 'a', 1),
+      ('pushcontext', 'iter 0'),
       ('recontext', 'iter 1'),
-      ('write', 'b', 1),
+      ('write', 'a', 1),
       ('recontext', 'iter 2'),
+      ('write', 'b', 1),
+      ('recontext', 'iter 3'),
       ('write', 'c', 1),
       ('popcontext',),
       ('pushcontext', 'empty'),
@@ -312,11 +312,11 @@ class SimplifiedRecordLog(Log):
       ('open', 0, 'test.dat', 'wb', 1, None),
       ('close', 0, b'test1'),
       ('pushcontext', 'my context'),
-      ('pushcontext', 'iter 0'),
+      ('pushcontext', 'iter 1'),
       ('write', 'a', 1),
-      ('recontext', 'iter 1'),
-      ('write', 'b', 1),
       ('recontext', 'iter 2'),
+      ('write', 'b', 1),
+      ('recontext', 'iter 3'),
       ('write', 'c', 1),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
@@ -423,9 +423,9 @@ class LoggingLog(Log):
     self.assertEqual(cm.output, [
       'Level 25:nutils:my message',
       'INFO:nutils:test.dat',
-      'INFO:nutils:my context > iter 0 > a',
-      'INFO:nutils:my context > iter 1 > b',
-      'INFO:nutils:my context > iter 2 > c',
+      'INFO:nutils:my context > iter 1 > a',
+      'INFO:nutils:my context > iter 2 > b',
+      'INFO:nutils:my context > iter 3 > c',
       'ERROR:nutils:my context > multiple..\n  ..lines',
       'INFO:nutils:my context > test.dat > generating',
       'Level 25:nutils:my context > test.dat',
