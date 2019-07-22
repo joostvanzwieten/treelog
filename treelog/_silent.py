@@ -91,21 +91,29 @@ class RecordLog(_base.Log):
      Exceptions raised while in a :meth:`Log.context` are not recorded.
   '''
 
-  def __init__(self):
+  def __init__(self, simplify=True):
     # Replayable log messages.  Each entry is a tuple of `(cmd, *args)`, where
     # `cmd` is either 'pushcontext', 'popcontext', 'open',
     # 'close' or 'write'.  See `self.replay` below.
+    self._simplify = simplify
     self._messages = []
     self._fid = 0 # internal file counter
     self._seen = {}
 
   def pushcontext(self, title):
-    self._messages.append(('pushcontext', title))
+    if self._simplify and self._messages and self._messages[-1][0] == 'popcontext':
+      self._messages[-1] = 'recontext', title
+    else:
+      self._messages.append(('pushcontext', title))
+
+  def recontext(self, title):
+    if self._simplify and self._messages and self._messages[-1][0] in ('pushcontext', 'recontext'):
+      self._messages[-1] = self._messages[-1][0], title
+    else:
+      self._messages.append(('recontext', title))
 
   def popcontext(self):
-    if self._messages and self._messages[-1][0] == 'pushcontext':
-      self._messages.pop()
-    else:
+    if not self._simplify or not self._messages or self._messages[-1][0] not in ('pushcontext', 'recontext') or self._messages.pop()[0] == 'recontext':
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
@@ -144,6 +152,9 @@ class RecordLog(_base.Log):
       if cmd == 'pushcontext':
         title, = args
         log.pushcontext(title)
+      elif cmd == 'recontext':
+        title, = args
+        log.recontext(title)
       elif cmd == 'popcontext':
         log.popcontext()
       elif cmd == 'open':

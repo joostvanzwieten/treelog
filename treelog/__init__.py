@@ -22,6 +22,7 @@ version = '1.0b4'
 
 import sys, functools, contextlib
 
+from . import iter
 from ._base import Log
 from ._forward import TeeLog, FilterLog
 from ._silent import NullLog, DataLog, RecordLog
@@ -53,12 +54,30 @@ def disable():
   return set(NullLog())
 
 @contextlib.contextmanager
-def context(*args, sep=' '):
-  current.pushcontext(sep.join(map(str, args)))
+def context(title, *initargs, **initkwargs):
+  '''Enterable context.
+
+  Returns an enterable object which upon enter creates a context with a given
+  title, to be automatically closed upon exit. In case additional arguments are
+  given the title is used as a format string, and a callable is returned that
+  allows for recontextualization from within the current with-block.'''
+
+  log = current
+  if initargs or initkwargs:
+    reformat = _compose(log.recontext, title.format)
+    title = title.format(*initargs, **initkwargs)
+  else:
+    reformat = None
+  log.pushcontext(title)
   try:
-    yield
+    yield reformat
   finally:
-    current.popcontext()
+    log.popcontext()
+
+def _compose(f, g):
+  '''Return composition of two callables.'''
+
+  return lambda *args, **kwargs: f(g(*args, **kwargs))
 
 def withcontext(f):
   '''Decorator; executes the wrapped function in its own logging context.'''

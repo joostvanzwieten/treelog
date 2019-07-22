@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io
+import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io, warnings, gc
 
 class Log(unittest.TestCase):
 
@@ -38,10 +38,9 @@ class Log(unittest.TestCase):
     treelog.user('my message')
     with treelog.infofile('test.dat', 'wb') as f:
       f.write(b'test1')
-    with treelog.context('my', 'context'):
-      with treelog.context('iter'):
-        for i, c in enumerate('abc'):
-          treelog.current.recontext('iter {}'.format(i))
+    with treelog.context('my context'):
+      with treelog.iter.plain('iter', 'abc') as items:
+        for c in items:
           treelog.info(c)
       with treelog.context('empty'):
         pass
@@ -66,9 +65,9 @@ class StdoutLog(Log):
     self.assertEqual(''.join(writes),
       'my message\n'
       'test.dat\n'
-      'my context > iter 0 > a\n'
-      'my context > iter 1 > b\n'
-      'my context > iter 2 > c\n'
+      'my context > iter 1 > a\n'
+      'my context > iter 2 > b\n'
+      'my context > iter 3 > c\n'
       'my context > multiple..\n'
       '  ..lines\n'
       'my context > test.dat > generating\n'
@@ -88,13 +87,13 @@ class RichOutputLog(Log):
       '\r\x1b[K',
       '\x1b[1mtest.dat\x1b[0m\n',
       'my context > ',
-      'iter > ',
-      '\x1b[2D0 > ',
-      '\x1b[1ma\x1b[0m\nmy context > iter 0 > ',
+      'iter 0 > ',
       '\x1b[4D1 > ',
-      '\x1b[1mb\x1b[0m\nmy context > iter 1 > ',
+      '\x1b[1ma\x1b[0m\nmy context > iter 1 > ',
       '\x1b[4D2 > ',
-      '\x1b[1mc\x1b[0m\nmy context > iter 2 > ',
+      '\x1b[1mb\x1b[0m\nmy context > iter 2 > ',
+      '\x1b[4D3 > ',
+      '\x1b[1mc\x1b[0m\nmy context > iter 3 > ',
       '\x1b[9D\x1b[K',
       'empty > ',
       '\x1b[8D\x1b[K',
@@ -193,13 +192,13 @@ class HtmlLog(Log):
         '<div class="item" data-loglevel="2">my message</div>\n',
         '<div class="item" data-loglevel="1"><a href="b444ac06613fc8d63795be9ad0beaf55011936ac.dat" download="test.dat">test.dat</a></div>\n',
         '<div class="context"><div class="title">my context</div><div class="children">\n',
-        '<div class="context"><div class="title">iter 0</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
         '<div class="item" data-loglevel="1">a</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 1</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
         '<div class="item" data-loglevel="1">b</div>\n',
         '</div><div class="end"></div></div>\n',
-        '<div class="context"><div class="title">iter 2</div><div class="children">\n',
+        '<div class="context"><div class="title">iter 3</div><div class="children">\n',
         '<div class="item" data-loglevel="1">c</div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4">multiple..\n',
@@ -255,21 +254,24 @@ class RecordLog(Log):
 
   @contextlib.contextmanager
   def output_tester(self):
-    recordlog = treelog.RecordLog()
+    recordlog = treelog.RecordLog(simplify=False)
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
       ('open', 0, 'test.dat', 'wb', 1, None),
+      ('pushcontext', 'test.dat'),
+      ('popcontext',),
       ('close', 0, b'test1'),
       ('pushcontext', 'my context'),
       ('pushcontext', 'iter 0'),
+      ('recontext', 'iter 1'),
       ('write', 'a', 1),
-      ('popcontext',),
-      ('pushcontext', 'iter 1'),
+      ('recontext', 'iter 2'),
       ('write', 'b', 1),
-      ('popcontext',),
-      ('pushcontext', 'iter 2'),
+      ('recontext', 'iter 3'),
       ('write', 'c', 1),
+      ('popcontext',),
+      ('pushcontext', 'empty'),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
       ('open', 1, 'test.dat', 'wb+', 2, None),
@@ -279,6 +281,50 @@ class RecordLog(Log):
       ('close', 1, b'test2'),
       ('popcontext',),
       ('pushcontext', 'generate_id'),
+      ('open', 2, 'test.dat', 'wb', 3, b'abc'),
+      ('pushcontext', 'test.dat'),
+      ('popcontext',),
+      ('close', 2, b'test3'),
+      ('popcontext',),
+      ('open', 3, 'same', 'wb', 4, b'abc'),
+      ('pushcontext', 'same'),
+      ('popcontext',),
+      ('close', 3, b'test3')])
+    for Log in StdoutLog, DataLog, HtmlLog, RichOutputLog:
+      with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
+        recordlog.replay(log)
+
+  def test_replay_in_current(self):
+    recordlog = treelog.RecordLog()
+    recordlog.write('test', level=1)
+    with self.assertSilent(), treelog.set(treelog.LoggingLog()), self.assertLogs('nutils'):
+      recordlog.replay()
+
+class SimplifiedRecordLog(Log):
+
+  @contextlib.contextmanager
+  def output_tester(self):
+    recordlog = treelog.RecordLog(simplify=True)
+    yield recordlog
+    self.assertEqual(recordlog._messages, [
+      ('write', 'my message', 2),
+      ('open', 0, 'test.dat', 'wb', 1, None),
+      ('close', 0, b'test1'),
+      ('pushcontext', 'my context'),
+      ('pushcontext', 'iter 1'),
+      ('write', 'a', 1),
+      ('recontext', 'iter 2'),
+      ('write', 'b', 1),
+      ('recontext', 'iter 3'),
+      ('write', 'c', 1),
+      ('popcontext',),
+      ('write', 'multiple..\n  ..lines', 4),
+      ('open', 1, 'test.dat', 'wb+', 2, None),
+      ('pushcontext', 'test.dat'),
+      ('write', 'generating', 1),
+      ('popcontext',),
+      ('close', 1, b'test2'),
+      ('recontext', 'generate_id'),
       ('open', 2, 'test.dat', 'wb', 3, b'abc'),
       ('close', 2, b'test3'),
       ('popcontext',),
@@ -360,8 +406,7 @@ class FilterLog(Log):
       ('write', 'multiple..\n  ..lines', 4),
       ('open', 0, 'test.dat', 'wb+', 2, None),
       ('close', 0, b'test2'),
-      ('popcontext',),
-      ('pushcontext', 'generate_id'),
+      ('recontext', 'generate_id'),
       ('open', 1, 'test.dat', 'wb', 3, b'abc'),
       ('close', 1, b'test3'),
       ('popcontext',),
@@ -377,9 +422,9 @@ class LoggingLog(Log):
     self.assertEqual(cm.output, [
       'Level 25:nutils:my message',
       'INFO:nutils:test.dat',
-      'INFO:nutils:my context > iter 0 > a',
-      'INFO:nutils:my context > iter 1 > b',
-      'INFO:nutils:my context > iter 2 > c',
+      'INFO:nutils:my context > iter 1 > a',
+      'INFO:nutils:my context > iter 2 > b',
+      'INFO:nutils:my context > iter 3 > c',
       'ERROR:nutils:my context > multiple..\n  ..lines',
       'INFO:nutils:my context > test.dat > generating',
       'Level 25:nutils:my context > test.dat',
@@ -396,6 +441,136 @@ class NullLog(Log):
   def test_disable(self):
     with treelog.disable():
       self.assertIsInstance(treelog.current, treelog.NullLog)
+
+class Iter(unittest.TestCase):
+
+  def setUp(self):
+    self.recordlog = treelog.RecordLog(simplify=False)
+    self.previous = treelog.current
+    treelog.current = self.recordlog
+
+  def tearDown(self):
+    treelog.current = self.previous
+
+  def assertMessages(self, *msg):
+    self.assertEqual(self.recordlog._messages, list(msg))
+
+  def test_context(self):
+    with treelog.iter.plain('test', enumerate('abc')) as myiter:
+      for i, c in myiter:
+        self.assertEqual(c, 'abc'[i])
+        treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 2'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 3'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_nocontext(self):
+    for i, c in treelog.iter.plain('test', enumerate('abc')):
+      self.assertEqual(c, 'abc'[i])
+      treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 2'),
+      ('write', 'hi', 1),
+      ('recontext', 'test 3'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_break_entered(self):
+    with warnings.catch_warnings(record=True) as w, treelog.iter.plain('test', [1,2,3]) as myiter:
+      for item in myiter:
+        self.assertEqual(item, 1)
+        treelog.info('hi')
+        break
+      gc.collect()
+    self.assertEqual(w, [])
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_break_notentered(self):
+    with self.assertWarns(ResourceWarning):
+      for item in treelog.iter.plain('test', [1,2,3]):
+        self.assertEqual(item, 1)
+        treelog.info('hi')
+        break
+      gc.collect()
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('write', 'hi', 1),
+      ('popcontext',))
+
+  def test_multiple(self):
+    with treelog.iter.plain('test', 'abc', [1,2]) as items:
+      self.assertEqual(list(items), [('a',1),('b',2)])
+
+  def test_plain(self):
+    with treelog.iter.plain('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0'),
+      ('recontext', 'test 1'),
+      ('recontext', 'test 2'),
+      ('recontext', 'test 3'),
+      ('popcontext',))
+
+  def test_plain_withbraces(self):
+    with treelog.iter.plain('t{es}t', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 't{es}t 0'),
+      ('recontext', 't{es}t 1'),
+      ('recontext', 't{es}t 2'),
+      ('recontext', 't{es}t 3'),
+      ('popcontext',))
+
+  def test_fraction(self):
+    with treelog.iter.fraction('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0/3'),
+      ('recontext', 'test 1/3'),
+      ('recontext', 'test 2/3'),
+      ('recontext', 'test 3/3'),
+      ('popcontext',))
+
+  def test_percentage(self):
+    with treelog.iter.percentage('test', 'abc') as items:
+      self.assertEqual(list(items), list('abc'))
+    self.assertMessages(
+      ('pushcontext', 'test 0%'),
+      ('recontext', 'test 33%'),
+      ('recontext', 'test 67%'),
+      ('recontext', 'test 100%'),
+      ('popcontext',))
+
+  def test_send(self):
+    def titles():
+      a = yield 'value'
+      while True:
+        a = yield 'value={!r}'.format(a)
+    with treelog.iter.wrap(titles(), 'abc') as items:
+      for i, item in enumerate(items):
+        self.assertEqual(item, 'abc'[i])
+      treelog.info('hi')
+    self.assertMessages(
+      ('pushcontext', 'value'),
+      ('recontext', "value='a'"),
+      ('recontext', "value='b'"),
+      ('recontext', "value='c'"),
+      ('write', 'hi', 1),
+      ('popcontext',))
 
 del Log # hide from unittest discovery
 
