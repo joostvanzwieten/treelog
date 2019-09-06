@@ -21,6 +21,7 @@ setup(
   packages = ['treelog'],
   package_data = {'treelog': ['py.typed']},
   ext_modules=ext_modules,
+  entry_points = {'console_scripts': ['treelog-fetch=treelog._util:fetch', 'treelog-gc=treelog._util:gc']},
   license = 'MIT',
   python_requires = '>=3.5',
   install_requires = ['typing_extensions'],
