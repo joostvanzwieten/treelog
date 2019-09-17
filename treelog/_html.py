@@ -356,30 +356,16 @@ const Log = class {
       return false;
     return true;
   }
-  *_reverse_contexts_iterator(context) {
-    while (true) {
-      if (!context || !context.classList.contains('context'))
-        return;
-      yield context;
-      context = context.parentElement;
-      if (!context)
-        return;
-      context = context.parentElement;
-    }
-  }
   init_elements(collapsed) {
     // Assign unique ids to context elements, collapse contexts according to
     // `state`.
     {
       let icontext = 0;
       for (const context of document.querySelectorAll('#log .context')) {
+        context.dataset.label = (context.parentElement.parentElement.dataset.label || '') + context.firstChild.innerText + '/';
         context.dataset.id = icontext;
         context.classList.toggle('collapsed', collapsed[icontext] || false);
         icontext += 1;
-        let label = [];
-        for (let part of this._reverse_contexts_iterator(context))
-          label.unshift((part.querySelector(':scope > .title') || {innerText: '?'}).innerText + '/');
-        context.dataset.label = label.join('');
       }
     }
 
