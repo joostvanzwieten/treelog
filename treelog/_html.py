@@ -204,7 +204,6 @@ body:not([data-show='theater']) #theater { display: none; }
 
 #theater:not(.overview) img.plot { object-fit: contain; width: 100%; height: 100%; }
 #theater.overview img.plot.selected { border: 2px solid #888; margin: -2px; }
-body.theater-locked #theater.overview img.plot.selected_category:not(.selected) { border: 2px solid #ddd; margin: -2px; }
 #theater.overview .plot_container1 { position: relative; width: 100%; height: 100%; }
 #theater.overview .plot_container2 { position: absolute; width: 100%; height: 100%; top: 0px; left: 0px; right: 0px; bottom: 0px; }
 #theater.overview .plot_container3 { height: calc(100% - 20px); display: flex; align-items: center; justify-content: center; }
@@ -293,9 +292,7 @@ const create_log_level_icon = function(level, options) {
 
 // NOTE: This should match the log levels defined in the `treelog` module.
 const LEVELS = ['debug', 'info', 'user', 'warning', 'error'];
-const VIEWABLE = ['.jpg', '.jpeg', '.png', '.svg'];
-// Make sure `VIEWABLE.filter(suffix => filename.endsWith(suffix))[0]` is always the longest match.
-VIEWABLE.sort((a, b) => b.length - a.length);
+const VIEWABLE = /[.](jpg|jpeg|png|svg)$/;
 
 const Log = class {
   constructor() {
@@ -359,30 +356,16 @@ const Log = class {
       return false;
     return true;
   }
-  *_reverse_contexts_iterator(context) {
-    while (true) {
-      if (!context || !context.classList.contains('context'))
-        return;
-      yield context;
-      context = context.parentElement;
-      if (!context)
-        return;
-      context = context.parentElement;
-    }
-  }
   init_elements(collapsed) {
     // Assign unique ids to context elements, collapse contexts according to
     // `state`.
     {
       let icontext = 0;
       for (const context of document.querySelectorAll('#log .context')) {
+        context.dataset.label = (context.parentElement.parentElement.dataset.label || '') + context.firstChild.innerText + '/';
         context.dataset.id = icontext;
         context.classList.toggle('collapsed', collapsed[icontext] || false);
         icontext += 1;
-        let label = [];
-        for (let part of this._reverse_contexts_iterator(context))
-          label.unshift((part.querySelector(':scope > .title') || {innerText: '?'}).innerText);
-        context.dataset.label = label.join('/');
       }
     }
 
@@ -406,31 +389,12 @@ const Log = class {
 
     // Link viewable anchors to theater.
     let ianchor = 0;
-    for (const anchor of document.querySelectorAll('#log .item > a')) {
-      const filename = anchor.innerText;
-      const suffix = VIEWABLE.filter(suffix => filename.endsWith(suffix));
-      if (!suffix.length)
-        continue;
-      const stem = filename.slice(0, filename.length - suffix[0].length);
-      if (!stem)
-        continue;
-      const category = (stem.match(/^(.*?)[0-9]*$/) || [null, null])[1];
+    for (const anchor of document.querySelectorAll('#log .item > a')) if (VIEWABLE.test(anchor.download)) {
+      anchor.classList.add('viewable');
       anchor.addEventListener('click', this._plot_clicked);
-
-      let context = null;
-      let parent = anchor.parentElement;
-      if (parent)
-        parent = parent.parentElement;
-      if (parent)
-        parent = parent.parentElement;
-      if (parent && parent.classList.contains('context'))
-        context = parent;
-      else
-        context = {dataset: {}};
-
       anchor.id = `plot-${ianchor}`;
       ianchor += 1;
-      theater.add_plot(anchor.href, anchor.id, category, context.dataset.id, (context.dataset.label ? context.dataset.label + '/' : '') + stem);
+      theater.add_plot(anchor);
     }
 
     // Make contexts clickable.
@@ -441,7 +405,7 @@ const Log = class {
     ev.stopPropagation();
     ev.preventDefault();
     window.history.pushState(window.history.state, 'log');
-    theater.href = ev.currentTarget.href;
+    theater.anchor = ev.currentTarget;
     document.body.dataset.show = 'theater';
     update_state();
   }
@@ -473,25 +437,20 @@ const Log = class {
 const Theater = class {
   constructor() {
     this.root = create_element('div', {id: 'theater', events: {'pointerdown': this.pointerdown.bind(this), 'pointerup': this.pointerup.bind(this)}});
-
     this.plots_per_category = {undefined: []};
-    this.plots_per_context = {};
-    this.info = {};
     this.touch_scroll_delta = 25;
   }
-  add_plot(href, anchor_id, category, context, label) {
-    const info = {href: href, anchor_id: anchor_id, category: category, index: this.plots_per_category[undefined].length, context: context, label: label};
-    this.plots_per_category[undefined].push(href);
-    if (category) {
-      if (!this.plots_per_category[category])
-        this.plots_per_category[category] = [];
-      info.index_category = this.plots_per_category[category].length;
-      this.plots_per_category[category].push(href);
-    }
-    if (!this.plots_per_context[context])
-      this.plots_per_context[context] = [];
-    this.plots_per_context[context].push(href);
-    this.info[href] = info;
+  add_plot(anchor) {
+    anchor.dataset.label = (anchor.parentElement.parentElement.parentElement.dataset.label || '') + anchor.download;
+    anchor.dataset.index = this.plots_per_category[undefined].length;
+    this.plots_per_category[undefined].push(anchor);
+    if (!this.plots_per_category[anchor.download])
+      this.plots_per_category[anchor.download] = [];
+    anchor.dataset.index_category = this.plots_per_category[anchor.download].length;
+    this.plots_per_category[anchor.download].push(anchor);
+  }
+  get context_plots() {
+    return this.anchor.parentElement.parentElement.querySelectorAll(':scope > .item > a.viewable');
   }
   get locked() {
     return document.body.classList.contains('theater-locked');
@@ -526,32 +485,29 @@ const Theater = class {
   }
   toggle_overview() { this.overview = !this.overview; }
   get category() {
-    return this.href ? this.info[this.href].category : undefined;
+    return this.anchor ? this.anchor.download : undefined;
   }
   get index() {
-    return this.href && (this.locked ? this.info[this.href].index_category : this.info[this.href].index);
+    return this.anchor && parseInt(this.locked ? this.anchor.dataset.index_category : this.anchor.dataset.index);
   }
-  get href() {
-    return this._href;
+  get anchor() {
+    return this._anchor;
   }
-  set href(href) {
-    if (href === undefined || this._href == href)
+  set anchor(anchor) {
+    if (anchor === undefined || this._anchor == anchor)
       return;
-    const old_href = this._href;
-    this._href = href;
-    if (this.overview) {
-      const old_context = old_href && this.info[old_href].context;
-      const new_context = this.info[this._href].context;
-      if (old_context != new_context)
-        this._draw_overview();
-    } else
+    const old_anchor = this._anchor;
+    this._anchor = anchor;
+    if (! this.overview)
       this._draw_plot();
+    else if (anchor.parentElement.parentElement != old_anchor.parentElement.parentElement)
+      this._draw_overview();
     this._update_selection();
-    document.getElementById('theater-label').innerText = this.info[this._href].label;
+    document.getElementById('theater-label').innerText = this._anchor.dataset.label;
     update_state();
   }
   _draw_plot() {
-    const plot = create_element('img', {src: this.href, 'class': 'plot', dataset: {category: this.info[this.href].category || ''}, events: {click: this._blur_plot.bind(this)}});
+    const plot = create_element('img', {src: this.anchor.href, 'class': 'plot', dataset: {plot_id: this.anchor.id}, events: {click: this._blur_plot.bind(this)}});
     this.root.innerHTML = '';
     this.root.classList.remove('overview');
     this.root.appendChild(plot);
@@ -560,26 +516,24 @@ const Theater = class {
     this.root.innerHTML = '';
     this.root.classList.add('overview');
     this._update_overview_layout();
-    for (const href of this.plots_per_context[this.info[this.href].context]) {
-      const plot = create_element('img', {src: href, 'class': 'plot', dataset: {category: this.info[href].category || ''}, events: {click: this._focus_plot.bind(this)}});
+    for (const anchor of this.context_plots) {
+      const plot = create_element('img', {src: anchor.href, 'class': 'plot', dataset: {plot_id: anchor.id}, events: {click: this._focus_plot.bind(this)}});
       const plot_container3 = create_element('div', {'class': 'plot_container3'}, plot);
       const plot_container2 = create_element('div', {'class': 'plot_container2'}, plot_container3);
-      if (this.info[href].category)
-        plot_container2.appendChild(create_element('div', {'class': 'label'}, this.info[href].category));
+      plot_container2.appendChild(create_element('div', {'class': 'label'}, anchor.download));
       this.root.appendChild(create_element('div', {'class': 'plot_container1'}, plot_container2));
     }
   }
   _update_selection() {
     const category = this.category;
     for (const plot of this.root.querySelectorAll('img.plot')) {
-      plot.classList.toggle('selected', plot.src == this.href);
-      plot.classList.toggle('selected_category', plot.dataset.category == category);
+      plot.classList.toggle('selected', plot.dataset.plot_id == this.anchor.id);
     }
   }
   _update_overview_layout() {
     let nplots;
     try {
-      nplots = this.plots_per_context[this.info[this.href].context].length;
+      nplots = this.context_plots.length;
     } catch (e) {
       return;
     }
@@ -615,25 +569,25 @@ const Theater = class {
     return this.plots_per_category[this.locked && this.category || undefined];
   }
   next() {
-    this.href = this.current_plots[this.index+1];
+    this.anchor = this.current_plots[this.index+1];
   }
   previous() {
-    this.href = this.current_plots[this.index-1];
+    this.anchor = this.current_plots[this.index-1];
   }
   first() {
-    this.href = this.current_plots[0];
+    this.anchor = this.current_plots[0];
   }
   last() {
     const plots = this.current_plots;
-    this.href = plots[plots.length-1];
+    this.anchor = plots[plots.length-1];
   }
   get state() {
-    return {href: this.href, locked: this.locked, overview: this.overview};
+    return {id: this.anchor.id, locked: this.locked, overview: this.overview};
   }
   set state(state) {
     if (state === undefined)
       return;
-    this.href = state.href;
+    this.anchor = document.getElementById(state.id);
     if (state.locked !== undefined)
       this.locked = state.locked;
     if (state.overview !== undefined)
@@ -642,7 +596,7 @@ const Theater = class {
   _open_log() {
     document.body.dataset.show = '';
     update_state(true);
-    log.scroll_into_view(this.info[this.href].anchor_id);
+    log.scroll_into_view(this.anchor.dataset.anchor_id);
   }
   keydown(ev) {
     if (ev.altKey || ev.ctrlKey || ev.metaKey)
@@ -683,14 +637,14 @@ const Theater = class {
         const delta_index = Math.floor((this._touch_scroll_pos-ev.screenY) / this.touch_scroll_delta);
         const index = Math.max(0, this.index - delta_index);
         this._touch_scroll_pos = index == 0 ? ev.screenY : this._touch_scroll_pos - delta_index*this.touch_scroll_delta;
-        this.href = this.current_plots[index];
+        this.anchor = this.current_plots[index];
       }
       else if (ev.screenY > this._touch_scroll_pos + this.touch_scroll_delta) {
         const delta_index = Math.floor((ev.screenY-this._touch_scroll_pos) / this.touch_scroll_delta);
         const max_index = this.current_plots.length - 1;
         const index = Math.min(max_index, this.index + delta_index);
         this._touch_scroll_pos = index == max_index ? ev.screenY : this._touch_scroll_pos + delta_index*this.touch_scroll_delta;
-        this.href = this.current_plots[index];
+        this.anchor = this.current_plots[index];
       }
     }
   }
