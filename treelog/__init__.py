@@ -20,19 +20,20 @@
 
 version = '1.0b5'
 
-import sys, functools, contextlib
+import sys, functools, contextlib, typing, typing_extensions
 
-from . import iter
-from ._base import Log
+from . import iter, proto
 from ._forward import TeeLog, FilterLog
 from ._silent import NullLog, DataLog, RecordLog
 from ._text import StdoutLog, RichOutputLog, LoggingLog
 from ._html import HtmlLog
 
-current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1)
+Log = None # For backwards compatibility.
+
+current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1) # type: proto.Log
 
 @contextlib.contextmanager
-def set(logger):
+def set(logger: proto.Log) -> typing.Generator[proto.Log, None, None]:
   '''Set logger as current.'''
 
   global current
@@ -43,18 +44,18 @@ def set(logger):
   finally:
     current = old
 
-def add(logger):
+def add(logger: proto.Log) -> typing_extensions.ContextManager[proto.Log]:
   '''Add logger to current.'''
 
   return set(TeeLog(current, logger))
 
-def disable():
+def disable() -> typing_extensions.ContextManager[proto.Log]:
   '''Disable logger.'''
 
   return set(NullLog())
 
 @contextlib.contextmanager
-def context(title, *initargs, **initkwargs):
+def context(title: str, *initargs: typing.Any, **initkwargs: typing.Any) -> typing.Generator[typing.Optional[typing.Callable[..., None]], None, None]:
   '''Enterable context.
 
   Returns an enterable object which upon enter creates a context with a given
@@ -64,7 +65,7 @@ def context(title, *initargs, **initkwargs):
 
   log = current
   if initargs or initkwargs:
-    reformat = _compose(log.recontext, title.format)
+    reformat = lambda *args, **kwargs: log.recontext(title.format(*args, **kwargs)) # type: typing.Optional[typing.Callable[..., None]]
     title = title.format(*initargs, **initkwargs)
   else:
     reformat = None
@@ -74,12 +75,7 @@ def context(title, *initargs, **initkwargs):
   finally:
     log.popcontext()
 
-def _compose(f, g):
-  '''Return composition of two callables.'''
-
-  return lambda *args, **kwargs: f(g(*args, **kwargs))
-
-def withcontext(f):
+def withcontext(f: typing.Callable[..., typing.Any]) -> typing.Callable[..., typing.Any]:
   '''Decorator; executes the wrapped function in its own logging context.'''
 
   @functools.wraps(f)
@@ -88,7 +84,7 @@ def withcontext(f):
       return f(*args, **kwargs)
   return wrapped
 
-def _print(level, *args, sep=' '):
+def _print(level: int, *args: typing.Any, sep: str = ' ') -> None:
   '''Write message to log.
 
   Args
@@ -101,7 +97,7 @@ def _print(level, *args, sep=' '):
   current.write(sep.join(map(str, args)), level)
 
 @contextlib.contextmanager
-def _file(level, name, mode, *, id=None):
+def _file(level: int, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing.Generator[proto.IO, None, None]:
   '''Open file in logger-controlled directory.
 
   Args

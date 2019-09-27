@@ -36,8 +36,8 @@ class Log(unittest.TestCase):
 
   def generate(self):
     treelog.user('my message')
-    with treelog.infofile('test.dat', 'wb') as f:
-      f.write(b'test1')
+    with treelog.infofile('test.dat', 'w') as f:
+      f.write('test1')
     with treelog.context('my context'):
       with treelog.iter.plain('iter', 'abc') as items:
         for c in items:
@@ -120,8 +120,8 @@ class DataLog(Log):
       yield treelog.DataLog(tmpdir)
       self.assertEqual(set(os.listdir(tmpdir)), {'test.dat', 'test-1.dat', 'test-2.dat', 'same', '.id'})
       self.assertEqual(os.listdir(os.path.join(tmpdir, '.id')), ['616263'])
-      with open(os.path.join(tmpdir, 'test.dat'), 'rb') as f:
-        self.assertEqual(f.read(), b'test1')
+      with open(os.path.join(tmpdir, 'test.dat'), 'r') as f:
+        self.assertEqual(f.read(), 'test1')
       with open(os.path.join(tmpdir, 'test-1.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test2')
       with open(os.path.join(tmpdir, 'test-2.dat'), 'rb') as f:
@@ -213,8 +213,8 @@ class HtmlLog(Log):
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4"><a href="616263" download="same">same</a></div>\n',
         '</div></body></html>\n'])
-      with open(os.path.join(tmpdir, 'b444ac06613fc8d63795be9ad0beaf55011936ac.dat'), 'rb') as f:
-        self.assertEqual(f.read(), b'test1')
+      with open(os.path.join(tmpdir, 'b444ac06613fc8d63795be9ad0beaf55011936ac.dat'), 'r') as f:
+        self.assertEqual(f.read(), 'test1')
       with open(os.path.join(tmpdir, '109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat'), 'rb') as f:
         self.assertEqual(f.read(), b'test2')
       with open(os.path.join(tmpdir, '616263.dat'), 'rb') as f:
@@ -258,10 +258,10 @@ class RecordLog(Log):
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('open', 0, 'test.dat', 'wb', 1, None),
+      ('open', 0, 'test.dat', 'w', 1, None),
       ('pushcontext', 'test.dat'),
       ('popcontext',),
-      ('close', 0, b'test1'),
+      ('close', 0, 'test1'),
       ('pushcontext', 'my context'),
       ('pushcontext', 'iter 0'),
       ('recontext', 'iter 1'),
@@ -308,8 +308,8 @@ class SimplifiedRecordLog(Log):
     yield recordlog
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', 2),
-      ('open', 0, 'test.dat', 'wb', 1, None),
-      ('close', 0, b'test1'),
+      ('open', 0, 'test.dat', 'w', 1, None),
+      ('close', 0, 'test1'),
       ('pushcontext', 'my context'),
       ('pushcontext', 'iter 1'),
       ('write', 'a', 1),

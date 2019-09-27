@@ -14,4 +14,5 @@ setup(
   packages = ['treelog'],
   license = 'MIT',
   python_requires = '>=3.5',
+  install_requires = ['typing_extensions'],
 )

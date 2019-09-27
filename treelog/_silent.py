@@ -18,32 +18,35 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import os, contextlib, functools
-from . import _base, _io
+import os, contextlib, functools, typing, typing_extensions
+from . import proto, _io
 
-class NullLog(_base.Log):
+class NullLog:
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     pass
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     pass
 
-  def write(self, text, level):
+  def recontext(self, title: str) -> None:
     pass
 
-  def open(self, filename, mode, level, id):
+  def write(self, text: str , level: int) -> None:
+    pass
+
+  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
     return _io.devnull(filename)
 
-class DataLog(_base.Log):
+class DataLog:
   '''Output only data.'''
 
-  def __init__(self, dirpath=os.curdir, names=_io.sequence):
+  def __init__(self, dirpath: str = os.curdir, names=_io.sequence) -> None:
     self._names = functools.lru_cache(maxsize=32)(names)
     self._dir = _io.directory(dirpath)
 
   @contextlib.contextmanager
-  def open(self, filename, mode, level, id):
+  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     f = None
     try:
       if id is None:
@@ -64,16 +67,19 @@ class DataLog(_base.Log):
     if id is None:
       self._dir.unlink(fname)
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     pass
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     pass
 
-  def write(self, text, level):
+  def recontext(self, title: str) -> None:
     pass
 
-class RecordLog(_base.Log):
+  def write(self, text: str, level: int) -> None:
+    pass
+
+class RecordLog:
   '''Record log messages.
 
   The recorded messages can be replayed to the logs that are currently active
@@ -91,55 +97,55 @@ class RecordLog(_base.Log):
      Exceptions raised while in a :meth:`Log.context` are not recorded.
   '''
 
-  def __init__(self, simplify=True):
+  def __init__(self, simplify: bool = True):
     # Replayable log messages.  Each entry is a tuple of `(cmd, *args)`, where
     # `cmd` is either 'pushcontext', 'popcontext', 'open',
     # 'close' or 'write'.  See `self.replay` below.
     self._simplify = simplify
-    self._messages = []
+    self._messages = [] # type: typing.List[typing.Any]
     self._fid = 0 # internal file counter
-    self._seen = {}
+    self._seen = {} # type: typing.Dict[bytes, typing.Union[str, bytes]]
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     if self._simplify and self._messages and self._messages[-1][0] == 'popcontext':
       self._messages[-1] = 'recontext', title
     else:
       self._messages.append(('pushcontext', title))
 
-  def recontext(self, title):
+  def recontext(self, title: str) -> None:
     if self._simplify and self._messages and self._messages[-1][0] in ('pushcontext', 'recontext'):
       self._messages[-1] = self._messages[-1][0], title
     else:
       self._messages.append(('recontext', title))
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     if not self._simplify or not self._messages or self._messages[-1][0] not in ('pushcontext', 'recontext') or self._messages.pop()[0] == 'recontext':
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
-  def open(self, filename, mode, level, id):
+  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     fid = self._fid
     self._fid += 1
     self._messages.append(('open', fid, filename, mode, level, id))
     try:
-      data = self._seen.get(id)
+      data = self._seen.get(id) if id else None # type: typing.Optional[typing.Union[str, bytes]]
       if data is not None:
         with _io.devnull(filename) as f:
           yield f
       else:
-        with _io.tempfile(filename, mode) as f:
-          yield f
-          f.seek(0)
-          data = f.read()
+        with _io.tempfile(filename, mode) as g:
+          yield g
+          g.seek(0)
+          data = g.read()
         if id:
           self._seen[id] = data
     finally:
       self._messages.append(('close', fid, data))
 
-  def write(self, text, level):
+  def write(self, text: str, level: int) -> None:
     self._messages.append(('write', text, level))
 
-  def replay(self, log=None):
+  def replay(self, log: typing.Optional[proto.Log] = None) -> None:
     '''Replay this recorded log.
 
     All recorded messages and files will be written to the log that is either
@@ -147,7 +153,8 @@ class RecordLog(_base.Log):
 
     files = {}
     if log is None:
-      from . import current as log
+      from . import current
+      log = current
     for cmd, *args in self._messages:
       if cmd == 'pushcontext':
         title, = args

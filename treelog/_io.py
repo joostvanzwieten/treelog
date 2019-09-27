@@ -18,30 +18,81 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, hashlib, tempfile as _tempfile, functools
+import io, os, contextlib, random, hashlib, tempfile as _tempfile, functools, typing, types, sys
+from . import proto
 
 virtual_filename_prefix = '<treelog>' + os.sep
 supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink, os.mkdir}
 
+class devnull:
+  '''File-like data sink.'''
+
+  _fileno = os.open(os.devnull, os.O_WRONLY) # type: typing.ClassVar[int]
+
+  def __init__(self, name: str) -> None:
+    self.__name = virtual_filename_prefix + name
+
+  @property
+  def name(self) -> str:
+    return self.__name
+
+  def __bool__(self) -> bool:
+    return False
+
+  def fileno(self) -> int:
+    return self._fileno
+
+  def readable(self) -> bool:
+    return False
+
+  def read(self, n: int = 0) -> typing.AnyStr:
+    raise io.UnsupportedOperation('not readable')
+
+  def writable(self) -> bool:
+    return True
+
+  def write(self, item: typing.AnyStr) -> int:
+    return len(item)
+
+  def seekable(self) -> bool:
+    return False
+
+  def seek(self, *args) -> int:
+    raise io.UnsupportedOperation('not seekable')
+
+  @property
+  def closed(self) -> bool:
+    return False
+
+  def close(self) -> None:
+    pass
+
+  def __enter__(self) -> 'devnull':
+    return self
+
+  def __exit__(self, t: typing.Optional[typing.Type[BaseException]], value: typing.Optional[BaseException], traceback: typing.Optional[types.TracebackType]) -> None:
+    pass
+
 class directory:
   '''Directory with support for dir_fd.'''
 
-  def __init__(self, path):
+  def __init__(self, path: str) -> None:
     os.makedirs(path, exist_ok=True)
     if supports_fd:
-      self._fd = os.open(path, flags=os.O_RDONLY) # convert to file descriptor
-      self._path = None
+      # convert to file descriptor
+      self._fd = os.open(path, flags=os.O_RDONLY) # type: typing.Optional[int]
+      self._path = None # type: typing.Optional[str]
     else:
       self._fd = None
       self._path = path
-    self._rng = None
+    self._rng = None # type: typing.Optional[random.Random]
 
-  def _join(self, name):
+  def _join(self, name: str) -> str:
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename, mode, *, encoding=None, name=None, umask=0o666):
+  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, name: typing.Optional[str] = None, umask: int = 0o666) -> typing.Any:
     if mode == 'w' or mode == 'w+':
-      wrapper = functools.partial(io.TextIOWrapper, encoding=encoding)
+      wrapper = functools.partial(io.TextIOWrapper, encoding=encoding) # type: typing.Union[typing.Type[io.BufferedWriter], typing.Type[io.BufferedRandom], typing.Callable[[io.FileIO], io.TextIOWrapper]]
     elif mode == 'wb':
       wrapper = io.BufferedWriter
     elif mode == 'wb+':
@@ -64,7 +115,7 @@ class directory:
       f.name = virtual_filename_prefix + (name or filename)
       return wrapper(f)
 
-  def hash(self, filename, hashtype):
+  def hash(self, filename: str, hashtype: str) -> bytes:
     h = hashlib.new(hashtype)
     blocksize = 65536
     fd = os.open(self._join(filename), os.O_RDONLY | getattr(os, 'O_BINARY', 0), dir_fd=self._fd)
@@ -77,7 +128,7 @@ class directory:
       os.close(fd)
     return h.digest()
 
-  def temp(self, mode, *, name=None):
+  def temp(self, mode: str, *, name: typing.Optional[str] = None) -> typing.Tuple[typing.Any, str]:
     if not self._rng:
       self._rng = random.Random()
     while True:
@@ -86,7 +137,7 @@ class directory:
       if f:
         return f, tmpname
 
-  def mkdir(self, path):
+  def mkdir(self, path: str) -> bool:
     try:
       os.mkdir(self._join(path), dir_fd=self._fd)
     except FileExistsError:
@@ -94,7 +145,7 @@ class directory:
     else:
       return True
 
-  def link(self, src, dst):
+  def link(self, src: str, dst: str) -> bool:
     try:
       os.link(self._join(src), self._join(dst), src_dir_fd=self._fd, dst_dir_fd=self._fd)
     except FileExistsError:
@@ -102,7 +153,7 @@ class directory:
     else:
       return True
 
-  def unlink(self, filename):
+  def unlink(self, filename: str) -> bool:
     try:
       os.unlink(self._join(filename), dir_fd=self._fd)
     except FileNotFoundError:
@@ -110,12 +161,12 @@ class directory:
     else:
       return True
 
-  def __del__(self):
+  def __del__(self) -> None:
     if os and os.close and self._fd is not None:
       os.close(self._fd)
 
 @contextlib.contextmanager
-def tempfile(name, mode):
+def tempfile(name: str, mode: str) -> typing.Generator[typing.Union[typing.TextIO, io.BufferedRandom], None, None]:
   '''Temporary file with virtual name.'''
 
   text = 'b' not in mode
@@ -125,35 +176,16 @@ def tempfile(name, mode):
   try:
     f = io.FileIO(fd, mode)
     f.name = virtual_filename_prefix + name
-    with io.TextIOWrapper(f) if text else io.BufferedRandom(f) as w:
-      yield w
+    if text:
+      with io.TextIOWrapper(typing.cast(typing.IO[bytes], f)) as wt:
+        yield wt
+    else:
+      with io.BufferedRandom(f) as wb:
+        yield wb
   finally:
     os.unlink(path)
 
-class devnull(io.IOBase):
-  '''File-like data sink.'''
-
-  _fileno = os.open(os.devnull, os.O_WRONLY)
-
-  def __init__(self, name):
-    self.name = virtual_filename_prefix + name
-
-  def __bool__(self):
-    return False
-
-  def writable(self):
-    return True
-
-  def write(self, item):
-    pass
-
-  def fileno(self):
-    return self._fileno
-
-  def seek(self, *args):
-    return 0
-
-def sequence(filename):
+def sequence(filename: str) -> typing.Generator[str, None, None]:
   '''Generate file names a.b, a-1.b, a-2.b, etc.'''
 
   yield filename
@@ -163,9 +195,9 @@ def sequence(filename):
     yield '-{}'.format(i).join(splitext)
     i += 1
 
-def set_ansi_console():
-  import platform
-  if platform.system() == 'Windows':
+def set_ansi_console() -> None:
+  if sys.platform == "win32":
+    import platform
     if platform.version() < '10.':
       raise RuntimeError('ANSI console mode requires Windows 10 or higher, detected {}'.format(platform.version()))
     import ctypes

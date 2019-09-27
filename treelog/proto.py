@@ -18,33 +18,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import abc
+import typing, typing_extensions
 
-class Log(abc.ABC):
-  '''Abstract base class for log objects.
+class IO(typing_extensions.Protocol[typing.AnyStr]):
 
-  A subclass must define a :meth:`context` method that handles a context
-  change, a :meth:`write` method that logs a message, and an :meth:`open`
-  method that returns a file context.'''
+  def fileno(self) -> int: ...
+  def readable(self) -> bool: ...
+  def read(self, n: int = ...) -> typing.AnyStr: ...
+  def writable(self) -> bool: ...
+  def write(self, data: typing.AnyStr) -> int: ...
+  def seekable(self) -> bool: ...
+  def seek(self, offset: int, whence: int = ...) -> int: ...
 
-  @abc.abstractmethod
-  def pushcontext(self, title):
-    raise NotImplementedError
+class Log(typing_extensions.Protocol):
 
-  @abc.abstractmethod
-  def popcontext(self):
-    raise NotImplementedError
-
-  def recontext(self, title):
-    self.popcontext()
-    self.pushcontext(title)
-
-  @abc.abstractmethod
-  def write(self, text, level):
-    raise NotImplementedError
-
-  @abc.abstractmethod
-  def open(self, filename, mode, level, id):
-    raise NotImplementedError
+  def pushcontext(self, title: str) -> None: ...
+  def popcontext(self) -> None: ...
+  def recontext(self, title: str) -> None: ...
+  def write(self, text: str, level: int) -> None: ...
+  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[IO]: ...
 
 # vim:sw=2:sts=2:et
