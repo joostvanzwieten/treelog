@@ -12,6 +12,7 @@ setup(
   author_email = 'info@evalf.com',
   url = 'https://github.com/evalf/treelog',
   packages = ['treelog'],
+  package_data = {'treelog': ['py.typed']},
   license = 'MIT',
   python_requires = '>=3.5',
   install_requires = ['typing_extensions'],
