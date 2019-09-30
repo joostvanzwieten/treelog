@@ -74,9 +74,9 @@ class HtmlLog:
       f = None
       if id:
         fname = id.hex() + ext
-        f = self._dir.open(fname, mode, name=filename)
+        f = self._dir.open(fname, mode)
       else:
-        f, fname = self._dir.temp(mode, name=filename)
+        f, fname = self._dir.temp(mode)
       with f:
         yield f
     except:

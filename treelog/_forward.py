@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, typing, typing_extensions
+import contextlib, typing, typing_extensions, tempfile
 from . import proto, _io
 
 class TeeLog:
@@ -60,7 +60,7 @@ class TeeLog:
         f1.seek(0)
         f2.write(f1.read())
       else:
-        with _io.tempfile(filename, mode) as tmp:
+        with tempfile.TemporaryFile(mode+'+') as tmp:
           yield tmp
           tmp.seek(0)
           data = tmp.read()
@@ -88,6 +88,6 @@ class FilterLog:
       self._baselog.write(text, level)
 
   def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
-    return self._baselog.open(filename, mode, level, id) if level >= self._minlevel else _io.devnull(filename)
+    return self._baselog.open(filename, mode, level, id) if level >= self._minlevel else _io.devnull()
 
 # vim:sw=2:sts=2:et

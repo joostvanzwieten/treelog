@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import os, contextlib, functools, typing, typing_extensions
+import os, contextlib, functools, typing, typing_extensions, tempfile
 from . import proto, _io
 
 class NullLog:
@@ -36,7 +36,7 @@ class NullLog:
     pass
 
   def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
-    return _io.devnull(filename)
+    return _io.devnull()
 
 class DataLog:
   '''Output only data.'''
@@ -50,11 +50,11 @@ class DataLog:
     f = None
     try:
       if id is None:
-        f, fname = self._dir.temp(mode, name=filename)
+        f, fname = self._dir.temp(mode)
       else:
         self._dir.mkdir('.id')
         fname = os.path.join('.id', id.hex())
-        f = self._dir.open(fname, mode, name=filename)
+        f = self._dir.open(fname, mode)
       with f:
         yield f
     except:
@@ -130,10 +130,10 @@ class RecordLog:
     try:
       data = self._seen.get(id) if id else None # type: typing.Optional[typing.Union[str, bytes]]
       if data is not None:
-        with _io.devnull(filename) as f:
+        with _io.devnull() as f:
           yield f
       else:
-        with _io.tempfile(filename, mode) as g:
+        with tempfile.TemporaryFile(mode+'+') as g:
           yield g
           g.seek(0)
           data = g.read()

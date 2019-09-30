@@ -18,23 +18,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, hashlib, tempfile as _tempfile, functools, typing, types, sys
+import io, os, contextlib, random, hashlib, functools, typing, types, sys
 from . import proto
 
-virtual_filename_prefix = '<treelog>' + os.sep
 supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink, os.mkdir}
 
 class devnull:
   '''File-like data sink.'''
 
   _fileno = os.open(os.devnull, os.O_WRONLY) # type: typing.ClassVar[int]
-
-  def __init__(self, name: str) -> None:
-    self.__name = virtual_filename_prefix + name
-
-  @property
-  def name(self) -> str:
-    return self.__name
 
   def __bool__(self) -> bool:
     return False
@@ -90,30 +82,13 @@ class directory:
   def _join(self, name: str) -> str:
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, name: typing.Optional[str] = None, umask: int = 0o666) -> typing.Any:
-    if mode == 'w' or mode == 'w+':
-      wrapper = functools.partial(io.TextIOWrapper, encoding=encoding) # type: typing.Union[typing.Type[io.BufferedWriter], typing.Type[io.BufferedRandom], typing.Callable[[io.FileIO], io.TextIOWrapper]]
-    elif mode == 'wb':
-      wrapper = io.BufferedWriter
-    elif mode == 'wb+':
-      wrapper = io.BufferedRandom
-    else:
+  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Union[typing.IO, devnull]:
+    if mode not in ('w', 'wb'):
       raise ValueError('invalid mode: {!r}'.format(mode))
-    flags = os.O_CREAT | os.O_EXCL
-    if '+' in mode:
-      flags |= os.O_RDWR
-    else:
-      flags |= os.O_WRONLY
-    if 'b' in mode and hasattr(os, 'O_BINARY'):
-      flags |= os.O_BINARY
     try:
-      fd = os.open(self._join(filename), flags=flags, mode=umask, dir_fd=self._fd)
+      return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
     except FileExistsError:
-      return devnull(name or filename)
-    else:
-      f = io.FileIO(fd, mode)
-      f.name = virtual_filename_prefix + (name or filename)
-      return wrapper(f)
+      return devnull()
 
   def hash(self, filename: str, hashtype: str) -> bytes:
     h = hashlib.new(hashtype)
@@ -128,12 +103,12 @@ class directory:
       os.close(fd)
     return h.digest()
 
-  def temp(self, mode: str, *, name: typing.Optional[str] = None) -> typing.Tuple[typing.Any, str]:
+  def temp(self, mode: str) -> typing.Tuple[typing.Union[typing.IO, devnull], str]:
     if not self._rng:
       self._rng = random.Random()
     while True:
       tmpname = ''.join(self._rng.choice('abcdefghijklmnopqrstuvwxyz0123456789_') for dummy in range(8))
-      f = self.open(tmpname, mode, name=name)
+      f = self.open(tmpname, mode)
       if f:
         return f, tmpname
 
@@ -164,26 +139,6 @@ class directory:
   def __del__(self) -> None:
     if os and os.close and self._fd is not None:
       os.close(self._fd)
-
-@contextlib.contextmanager
-def tempfile(name: str, mode: str) -> typing.Generator[typing.Union[typing.TextIO, io.BufferedRandom], None, None]:
-  '''Temporary file with virtual name.'''
-
-  text = 'b' not in mode
-  fd, path = _tempfile.mkstemp(text=text)
-  if '+' not in mode:
-    mode += '+'
-  try:
-    f = io.FileIO(fd, mode)
-    f.name = virtual_filename_prefix + name
-    if text:
-      with io.TextIOWrapper(typing.cast(typing.IO[bytes], f)) as wt:
-        yield wt
-    else:
-      with io.BufferedRandom(f) as wb:
-        yield wb
-  finally:
-    os.unlink(path)
 
 def sequence(filename: str) -> typing.Generator[str, None, None]:
   '''Generate file names a.b, a-1.b, a-2.b, etc.'''

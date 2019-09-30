@@ -340,6 +340,34 @@ class SimplifiedRecordLog(Log):
     with self.assertSilent(), treelog.set(treelog.LoggingLog()), self.assertLogs('nutils'):
       recordlog.replay()
 
+class TeeLogTestLog:
+
+  def __init__(self, dir, update, filenos):
+    self._dir = dir
+    self._update = update
+    self.filenos = filenos
+
+  def pushcontext(self, title):
+    pass
+
+  def popcontext(self):
+    pass
+
+  def recontext(self, title):
+    pass
+
+  def write(self, text, level):
+    pass
+
+  @contextlib.contextmanager
+  def open(self, filename, mode, level, id=None):
+    with open(os.path.join(self._dir, filename), mode+'+' if self._update else mode) as f:
+      self.filenos.add(f.fileno())
+      try:
+        yield f
+      finally:
+        self.filenos.remove(f.fileno())
+
 class TeeLog(Log):
 
   @contextlib.contextmanager
@@ -354,44 +382,82 @@ class TeeLog(Log):
     with silent, teelog.open('test', 'wb', level=1, id=None) as f:
       self.assertFalse(f)
 
-  def test_open_devnull_file(self):
+  def test_open_devnull_rw(self):
     with tempfile.TemporaryDirectory() as tmpdir:
-      teelog = treelog.TeeLog(treelog.StdoutLog(), treelog.DataLog(tmpdir))
+      filenos = set()
+      teelog = treelog.TeeLog(treelog.StdoutLog(), TeeLogTestLog(tmpdir, True, filenos))
       with silent, teelog.open('test', 'wb', level=1, id=None) as f:
-        self.assertIsInstance(f, io.BufferedWriter)
+        self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
-  def test_open_file_devnull(self):
+  def test_open_rw_devnull(self):
     with tempfile.TemporaryDirectory() as tmpdir:
-      teelog = treelog.TeeLog(treelog.DataLog(tmpdir), treelog.StdoutLog())
+      filenos = set()
+      teelog = treelog.TeeLog(TeeLogTestLog(tmpdir, True, filenos), treelog.StdoutLog())
       with silent, teelog.open('test', 'wb', level=1, id=None) as f:
-        self.assertIsInstance(f, io.BufferedWriter)
+        self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
-  def test_open_file_file(self):
+  def test_open_rw_rw(self):
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+      filenos = set()
+      teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, True, filenos), TeeLogTestLog(tmpdir2, True, filenos))
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+        self.assertIn(f.fileno(), filenos)
+        f.write(b'test')
+      with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+      with open(os.path.join(tmpdir2, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+
+  def test_open_rw_wo(self):
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+      filenos = set()
+      teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, True, filenos), TeeLogTestLog(tmpdir2, False, set()))
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+        self.assertIn(f.fileno(), filenos)
+        f.write(b'test')
+      with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+      with open(os.path.join(tmpdir2, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+
+  def test_open_wo_rw(self):
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+      filenos = set()
+      teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, False, set()), TeeLogTestLog(tmpdir2, True, filenos))
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+        self.assertIn(f.fileno(), filenos)
+        f.write(b'test')
+      with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+      with open(os.path.join(tmpdir2, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+
+  def test_open_wo_wo(self):
+    with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+      filenos = set()
+      teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, False, filenos), TeeLogTestLog(tmpdir2, False, filenos))
+      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+        self.assertNotIn(f.fileno(), filenos)
+        f.write(b'test')
+      with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+      with open(os.path.join(tmpdir2, 'test'), 'rb') as f:
+        self.assertEqual(f.read(), b'test')
+
+  def test_open_datalog_datalog_samedir(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       teelog = treelog.TeeLog(treelog.DataLog(tmpdir), treelog.DataLog(tmpdir))
       with teelog.open('test', 'wb', level=1, id=None) as f:
-        self.assertIsInstance(f, io.BufferedRandom)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
       with open(os.path.join(tmpdir, 'test-1'), 'rb') as f:
-        self.assertEqual(f.read(), b'test')
-
-  def test_open_seekable_file(self):
-    with tempfile.TemporaryDirectory() as tmpdir:
-      recordlog = treelog.RecordLog()
-      teelog = treelog.TeeLog(recordlog, treelog.DataLog(tmpdir))
-      with teelog.open('test', 'wb', level=1, id=b'abc') as f:
-        self.assertIsInstance(f, io.BufferedRandom)
-        f.write(b'test')
-      self.assertEqual(recordlog._seen[b'abc'], b'test')
-      with open(os.path.join(tmpdir, 'test'), 'rb') as f:
         self.assertEqual(f.read(), b'test')
 
 class FilterLog(Log):
