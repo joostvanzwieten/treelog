@@ -28,6 +28,10 @@ from ._silent import NullLog, DataLog, RecordLog
 from ._text import StdoutLog, RichOutputLog, LoggingLog
 from ._html import HtmlLog
 
+for _log in TeeLog, FilterLog, NullLog, DataLog, RecordLog, StdoutLog, RichOutputLog, LoggingLog, HtmlLog:
+  _log.__module__ = __name__
+del _log
+
 Log = None # For backwards compatibility.
 
 current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1) # type: proto.Log
