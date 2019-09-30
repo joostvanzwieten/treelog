@@ -45,7 +45,7 @@ class Log(unittest.TestCase):
       with treelog.context('empty'):
         pass
       treelog.error('multiple..\n  ..lines')
-      with treelog.userfile('test.dat', 'wb+') as f:
+      with treelog.userfile('test.dat', 'wb') as f:
         treelog.info('generating')
         f.write(b'test2')
     self.generate_id(b'abc')
@@ -274,7 +274,7 @@ class RecordLog(Log):
       ('pushcontext', 'empty'),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open', 1, 'test.dat', 'wb+', 2, None),
+      ('open', 1, 'test.dat', 'wb', 2, None),
       ('pushcontext', 'test.dat'),
       ('write', 'generating', 1),
       ('popcontext',),
@@ -319,7 +319,7 @@ class SimplifiedRecordLog(Log):
       ('write', 'c', 1),
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open', 1, 'test.dat', 'wb+', 2, None),
+      ('open', 1, 'test.dat', 'wb', 2, None),
       ('pushcontext', 'test.dat'),
       ('write', 'generating', 1),
       ('popcontext',),
@@ -404,7 +404,7 @@ class FilterLog(Log):
       ('write', 'my message', 2),
       ('pushcontext', 'my context'),
       ('write', 'multiple..\n  ..lines', 4),
-      ('open', 0, 'test.dat', 'wb+', 2, None),
+      ('open', 0, 'test.dat', 'wb', 2, None),
       ('close', 0, b'test2'),
       ('recontext', 'generate_id'),
       ('open', 1, 'test.dat', 'wb', 3, b'abc'),

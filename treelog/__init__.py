@@ -113,6 +113,8 @@ def _file(level: int, name: str, mode: str, *, id: typing.Optional[bytes] = None
       Bytes identifier that can be used to decide a priori that a file has
       already been constructed. Default: None.
   '''
+  if mode not in ('w', 'wb'):
+    raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
   with current.open(name, mode, level, id) as f, context(name):
     yield f
 
