@@ -26,8 +26,9 @@ class Log(unittest.TestCase):
 
   @contextlib.contextmanager
   def assertSilent(self):
-    with contextlib.redirect_stdout(write(self.fail)):
+    with capture() as captured:
       yield
+    self.assertEqual(captured.stdout, '')
 
   @treelog.withcontext
   def generate_id(self, id):
@@ -60,9 +61,9 @@ class StdoutLog(Log):
 
   @contextlib.contextmanager
   def output_tester(self):
-    with capture() as writes:
+    with capture() as captured:
       yield treelog.StdoutLog()
-    self.assertEqual(''.join(writes),
+    self.assertEqual(captured.stdout,
       'my message\n'
       'test.dat\n'
       'my context > iter 1 > a\n'
@@ -79,38 +80,38 @@ class RichOutputLog(Log):
 
   @contextlib.contextmanager
   def output_tester(self):
-    with capture() as writes:
+    with capture() as captured:
       yield treelog.RichOutputLog()
-    self.assertEqual(writes, [
-      '\x1b[1;34mmy message\x1b[0m\n',
-      'test.dat > ',
-      '\r\x1b[K',
-      '\x1b[1mtest.dat\x1b[0m\n',
-      'my context > ',
-      'iter 0 > ',
-      '\x1b[4D1 > ',
-      '\x1b[1ma\x1b[0m\nmy context > iter 1 > ',
-      '\x1b[4D2 > ',
-      '\x1b[1mb\x1b[0m\nmy context > iter 2 > ',
-      '\x1b[4D3 > ',
-      '\x1b[1mc\x1b[0m\nmy context > iter 3 > ',
-      '\x1b[9D\x1b[K',
-      'empty > ',
-      '\x1b[8D\x1b[K',
-      '\x1b[1;31mmultiple..\n  ..lines\x1b[0m\nmy context > ',
-      'test.dat > ',
-      '\x1b[1mgenerating\x1b[0m\nmy context > test.dat > ',
-      '\x1b[11D\x1b[K',
-      '\x1b[1;34mtest.dat\x1b[0m\nmy context > ',
-      '\r\x1b[K',
-      'generate_id > ',
-      'test.dat > ',
-      '\x1b[11D\x1b[K',
-      '\x1b[1;35mtest.dat\x1b[0m\ngenerate_id > ',
-      '\r\x1b[K',
-      'same > ',
-      '\r\x1b[K',
-      '\x1b[1;31msame\x1b[0m\n'])
+    self.assertEqual(captured.stdout,
+      '\x1b[1;34mmy message\x1b[0m\n'
+      'test.dat > '
+      '\r\x1b[K'
+      '\x1b[1mtest.dat\x1b[0m\n'
+      'my context > '
+      'iter 0 > '
+      '\x1b[4D1 > '
+      '\x1b[1ma\x1b[0m\nmy context > iter 1 > '
+      '\x1b[4D2 > '
+      '\x1b[1mb\x1b[0m\nmy context > iter 2 > '
+      '\x1b[4D3 > '
+      '\x1b[1mc\x1b[0m\nmy context > iter 3 > '
+      '\x1b[9D\x1b[K'
+      'empty > '
+      '\x1b[8D\x1b[K'
+      '\x1b[1;31mmultiple..\n  ..lines\x1b[0m\nmy context > '
+      'test.dat > '
+      '\x1b[1mgenerating\x1b[0m\nmy context > test.dat > '
+      '\x1b[11D\x1b[K'
+      '\x1b[1;34mtest.dat\x1b[0m\nmy context > '
+      '\r\x1b[K'
+      'generate_id > '
+      'test.dat > '
+      '\x1b[11D\x1b[K'
+      '\x1b[1;35mtest.dat\x1b[0m\ngenerate_id > '
+      '\r\x1b[K'
+      'same > '
+      '\r\x1b[K'
+      '\x1b[1;31msame\x1b[0m\n')
 
 class DataLog(Log):
 
@@ -227,7 +228,7 @@ class HtmlLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir:
       outdira = os.path.join(tmpdir, 'a')
       outdirb = os.path.join(tmpdir, 'b')
-      with silent, treelog.HtmlLog(outdira) as log:
+      with silent(), treelog.HtmlLog(outdira) as log:
         os.rename(outdira, outdirb)
         os.mkdir(outdira)
         with log.open('dat', 'wb', level=1, id=None) as f:
@@ -236,7 +237,7 @@ class HtmlLog(Log):
 
   def test_remove_on_failure(self):
     with tempfile.TemporaryDirectory() as tmpdir:
-      with silent, treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
+      with silent(), treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
         with log.open('dat', 'wb', level=1, id=None) as f:
           f.write(b'test')
           raise RuntimeError
@@ -244,7 +245,7 @@ class HtmlLog(Log):
 
   def test_remove_on_failure_id(self):
     with tempfile.TemporaryDirectory() as tmpdir:
-      with silent, treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
+      with silent(), treelog.HtmlLog(tmpdir) as log, self.assertRaises(RuntimeError):
         with log.open('dat', 'wb', level=1, id=b'abc') as f:
           f.write(b'test')
           raise RuntimeError
@@ -379,14 +380,14 @@ class TeeLog(Log):
 
   def test_open_devnull_devnull(self):
     teelog = treelog.TeeLog(treelog.StdoutLog(), treelog.StdoutLog())
-    with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+    with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
       self.assertFalse(f)
 
   def test_open_devnull_rw(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       filenos = set()
       teelog = treelog.TeeLog(treelog.StdoutLog(), TeeLogTestLog(tmpdir, True, filenos))
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
@@ -396,7 +397,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir:
       filenos = set()
       teelog = treelog.TeeLog(TeeLogTestLog(tmpdir, True, filenos), treelog.StdoutLog())
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir, 'test'), 'rb') as f:
@@ -406,7 +407,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
       filenos = set()
       teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, True, filenos), TeeLogTestLog(tmpdir2, True, filenos))
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
@@ -418,7 +419,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
       filenos = set()
       teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, True, filenos), TeeLogTestLog(tmpdir2, False, set()))
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
@@ -430,7 +431,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
       filenos = set()
       teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, False, set()), TeeLogTestLog(tmpdir2, True, filenos))
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
@@ -442,7 +443,7 @@ class TeeLog(Log):
     with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
       filenos = set()
       teelog = treelog.TeeLog(TeeLogTestLog(tmpdir1, False, filenos), TeeLogTestLog(tmpdir2, False, filenos))
-      with silent, teelog.open('test', 'wb', level=1, id=None) as f:
+      with silent(), teelog.open('test', 'wb', level=1, id=None) as f:
         self.assertNotIn(f.fileno(), filenos)
         f.write(b'test')
       with open(os.path.join(tmpdir1, 'test'), 'rb') as f:
@@ -642,22 +643,18 @@ del Log # hide from unittest discovery
 
 ## INTERNALS
 
-class write:
-  def __init__(self, write):
-    self.write = write
-  def flush(self):
-    pass
-
 @contextlib.contextmanager
 def capture():
-  writes = []
-  with contextlib.redirect_stdout(write(writes.append)):
-    yield writes
+  with tempfile.TemporaryFile('w+', newline='') as f:
+    class captured: pass
+    with contextlib.redirect_stdout(f):
+      yield captured
+    f.seek(0)
+    captured.stdout = f.read()
 
-@write
-def devnull(text):
-  pass
-
-silent = contextlib.redirect_stdout(devnull)
+@contextlib.contextmanager
+def silent():
+  with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f):
+    yield
 
 # vim:sw=2:sts=2:et
