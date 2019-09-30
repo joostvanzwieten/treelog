@@ -63,7 +63,7 @@ class StdoutLog(ContextLog):
   '''Output plain text to stream.'''
 
   def write(self, text: str, level: int) -> None:
-    print(*self.currentcontext, text, sep=' > ')
+    print(' > '.join((*self.currentcontext, text)))
 
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
