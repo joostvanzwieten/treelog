@@ -52,6 +52,10 @@ class Log(unittest.TestCase):
     self.generate_id(b'abc')
     with treelog.errorfile('same', 'wb', id=b'abc') as f:
       f.write(b'test3')
+    with treelog.debugfile('dbg.dat', 'wb') as f:
+      f.write(b'test4')
+    treelog.debug('dbg')
+    treelog.warning('warn')
 
   def test_output(self):
     with self.assertSilent(), self.output_tester() as log, treelog.set(log):
@@ -74,7 +78,10 @@ class StdoutLog(Log):
       'my context > test.dat > generating\n'
       'my context > test.dat\n'
       'generate_id > test.dat\n'
-      'same\n')
+      'same\n'
+      'dbg.dat\n'
+      'dbg\n'
+      'warn\n')
 
 class RichOutputLog(Log):
 
@@ -111,7 +118,12 @@ class RichOutputLog(Log):
       '\r\x1b[K'
       'same > '
       '\r\x1b[K'
-      '\x1b[1;31msame\x1b[0m\n')
+      '\x1b[1;31msame\x1b[0m\n'
+      'dbg.dat > '
+      '\r\x1b[K'
+      '\x1b[1;30mdbg.dat\x1b[0m\n'
+      '\x1b[1;30mdbg\x1b[0m\n'
+      '\x1b[1;35mwarn\x1b[0m\n')
 
 class DataLog(Log):
 
@@ -119,7 +131,7 @@ class DataLog(Log):
   def output_tester(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       yield treelog.DataLog(tmpdir)
-      self.assertEqual(set(os.listdir(tmpdir)), {'test.dat', 'test-1.dat', 'test-2.dat', 'same', '.id'})
+      self.assertEqual(set(os.listdir(tmpdir)), {'test.dat', 'test-1.dat', 'test-2.dat', 'same', '.id', 'dbg.dat'})
       self.assertEqual(os.listdir(os.path.join(tmpdir, '.id')), ['616263'])
       with open(os.path.join(tmpdir, 'test.dat'), 'r') as f:
         self.assertEqual(f.read(), 'test1')
@@ -131,6 +143,8 @@ class DataLog(Log):
         self.assertEqual(f.read(), b'test3')
       with open(os.path.join(tmpdir, '.id', '616263'), 'rb') as f:
         self.assertEqual(f.read(), b'test3')
+      with open(os.path.join(tmpdir, 'dbg.dat'), 'r') as f:
+        self.assertEqual(f.read(), 'test4')
 
   @unittest.skipIf(not treelog._io.supports_fd, 'dir_fd not supported on platform')
   def test_move_outdir(self):
@@ -213,6 +227,11 @@ class HtmlLog(Log):
         '<div class="item" data-loglevel="3"><a href="616263.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4"><a href="616263" download="same">same</a></div>\n',
+        '<div class="item" data-loglevel="0"><a '
+        'href="1ff2b3704aede04eecb51e50ca698efd50a1379b.dat" '
+        'download="dbg.dat">dbg.dat</a></div>\n',
+        '<div class="item" data-loglevel="0">dbg</div>\n',
+        '<div class="item" data-loglevel="3">warn</div>\n',
         '</div></body></html>\n'])
       with open(os.path.join(tmpdir, 'b444ac06613fc8d63795be9ad0beaf55011936ac.dat'), 'r') as f:
         self.assertEqual(f.read(), 'test1')
@@ -302,7 +321,13 @@ class RecordLog(Log):
       ('open', 3, 'same', 'wb', 4, b'abc'),
       ('pushcontext', 'same'),
       ('popcontext',),
-      ('close', 3, b'test3')])
+      ('close', 3, b'test3'),
+      ('open', 4, 'dbg.dat', 'wb', 0, None),
+      ('pushcontext', 'dbg.dat'),
+      ('popcontext',),
+      ('close', 4, b'test4'),
+      ('write', 'dbg', 0),
+      ('write', 'warn', 3)])
     for Log in StdoutLog, DataLog, HtmlLog, RichOutputLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
@@ -342,7 +367,11 @@ class SimplifiedRecordLog(Log):
       ('close', 2, b'test3'),
       ('popcontext',),
       ('open', 3, 'same', 'wb', 4, b'abc'),
-      ('close', 3, b'test3')])
+      ('close', 3, b'test3'),
+      ('open', 4, 'dbg.dat', 'wb', 0, None),
+      ('close', 4, b'test4'),
+      ('write', 'dbg', 0),
+      ('write', 'warn', 3)])
     for Log in StdoutLog, DataLog, HtmlLog:
       with self.subTest('replay to {}'.format(Log.__name__)), Log.output_tester(self) as log:
         recordlog.replay(log)
@@ -490,7 +519,8 @@ class FilterLog(Log):
       ('close', 1, b'test3'),
       ('popcontext',),
       ('open', 2, 'same', 'wb', 4, b'abc'),
-      ('close', 2, b'test3')])
+      ('close', 2, b'test3'),
+      ('write', 'warn', 3)])
 
 class LoggingLog(Log):
 
@@ -508,7 +538,8 @@ class LoggingLog(Log):
       'INFO:nutils:my context > test.dat > generating',
       'Level 25:nutils:my context > test.dat',
       'WARNING:nutils:generate_id > test.dat',
-      'ERROR:nutils:same'])
+      'ERROR:nutils:same',
+      'WARNING:nutils:warn'])
 
 class NullLog(Log):
 

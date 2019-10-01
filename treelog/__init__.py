@@ -88,39 +88,51 @@ def withcontext(f: typing.Callable[..., typing.Any]) -> typing.Callable[..., typ
       return f(*args, **kwargs)
   return wrapped
 
-def _print(level: int, *args: typing.Any, sep: str = ' ') -> None:
-  '''Write message to log.
+class _Print:
 
-  Args
-  ----
-  *args : tuple of :class:`str`
-      Values to be printed to the log.
-  sep : :class:`str`
-      String inserted between values, default a space.
-  '''
-  current.write(sep.join(map(str, args)), level)
+  def __init__(self, level: int) -> None:
+    self._level = level # type: typing_extensions.Final[int]
 
-@contextlib.contextmanager
-def _file(level: int, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing.Generator[proto.IO, None, None]:
-  '''Open file in logger-controlled directory.
+  def __call__(self, *args: typing.Any, sep: str = ' ') -> None:
+    '''Write message to log.
 
-  Args
-  ----
-  filename : :class:`str`
-  mode : :class:`str`
-      Should be either ``'w'`` (text) or ``'wb'`` (binary data).
-  id :
-      Bytes identifier that can be used to decide a priori that a file has
-      already been constructed. Default: None.
-  '''
-  if mode not in ('w', 'wb'):
-    raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
-  with current.open(name, mode, level, id) as f, context(name):
-    yield f
+    Args
+    ----
+    *args : tuple of :class:`str`
+        Values to be printed to the log.
+    sep : :class:`str`
+        String inserted between values, default a space.
+    '''
+    current.write(sep.join(map(str, args)), self._level)
 
-debug, info, user, warning, error = [functools.partial(_print, level) for level in range(5)]
-debugfile, infofile, userfile, warningfile, errorfile = [functools.partial(_file, level) for level in range(5)]
+  @contextlib.contextmanager
+  def _open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing.Generator[proto.IO, None, None]:
+    with current.open(name, mode, self._level, id) as f, context(name):
+      yield f
 
-del _print, _file
+  @typing.overload
+  def open(self, name: str, mode: typing_extensions.Literal['w'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[str]]: ...
+  @typing.overload
+  def open(self, name: str, mode: typing_extensions.Literal['wb'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[bytes]]: ...
+  @typing.overload
+  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]: ...
+  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]:
+    '''Open file in logger-controlled directory.
+
+    Args
+    ----
+    filename : :class:`str`
+    mode : :class:`str`
+        Should be either ``'w'`` (text) or ``'wb'`` (binary data).
+    id :
+        Bytes identifier that can be used to decide a priori that a file has
+        already been constructed. Default: None.
+    '''
+    if mode not in ('w', 'wb'):
+      raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
+    return self._open(name, mode, id=id)
+
+debug, info, user, warning, error = map(_Print, range(5))
+debugfile, infofile, userfile, warningfile, errorfile = debug.open, info.open, user.open, warning.open, error.open
 
 # vim:sw=2:sts=2:et
