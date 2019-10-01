@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, typing, typing_extensions, tempfile
+import contextlib, typing, typing_extensions, tempfile, warnings
 from . import proto, _io
 
 class TeeLog:
@@ -70,9 +70,13 @@ class TeeLog:
 class FilterLog:
   '''Filter messages based on level.'''
 
-  def __init__(self, baselog: proto.Log, minlevel: proto.Level) -> None:
+  def __init__(self, baselog: proto.Log, minlevel: typing.Union[proto.Level, int]) -> None:
     self._baselog = baselog
-    self._minlevel = minlevel
+    if isinstance(minlevel, int):
+      warnings.warn('minlevel of type "int" is deprecated, use "proto.Level" instead', DeprecationWarning)
+      self._minlevel = tuple(proto.Level)[minlevel] # type: proto.Level
+    else:
+      self._minlevel = minlevel
 
   def pushcontext(self, title: str) -> None:
     self._baselog.pushcontext(title)
