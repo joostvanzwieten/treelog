@@ -34,7 +34,7 @@ del _log
 
 Log = None # For backwards compatibility.
 
-current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1) # type: proto.Log
+current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=proto.Level.info) # type: proto.Log
 
 @contextlib.contextmanager
 def set(logger: proto.Log) -> typing.Generator[proto.Log, None, None]:
@@ -90,8 +90,8 @@ def withcontext(f: typing.Callable[..., typing.Any]) -> typing.Callable[..., typ
 
 class _Print:
 
-  def __init__(self, level: int) -> None:
-    self._level = level # type: typing_extensions.Final[int]
+  def __init__(self, level: proto.Level) -> None:
+    self._level = level # type: typing_extensions.Final[proto.Level]
 
   def __call__(self, *args: typing.Any, sep: str = ' ') -> None:
     '''Write message to log.
@@ -132,7 +132,7 @@ class _Print:
       raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
     return self._open(name, mode, id=id)
 
-debug, info, user, warning, error = map(_Print, range(5))
+debug, info, user, warning, error = map(_Print, proto.Level)
 debugfile, infofile, userfile, warningfile, errorfile = debug.open, info.open, user.open, warning.open, error.open
 
 # vim:sw=2:sts=2:et

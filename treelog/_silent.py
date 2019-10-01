@@ -32,10 +32,10 @@ class NullLog:
   def recontext(self, title: str) -> None:
     pass
 
-  def write(self, text: str , level: int) -> None:
+  def write(self, text: str , level: proto.Level) -> None:
     pass
 
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
     return _io.devnull()
 
 class DataLog:
@@ -46,7 +46,7 @@ class DataLog:
     self._dir = _io.directory(dirpath)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     f = None
     try:
       if id is None:
@@ -74,7 +74,7 @@ class DataLog:
   def recontext(self, title: str) -> None:
     pass
 
-  def write(self, text: str, level: int) -> None:
+  def write(self, text: str, level: proto.Level) -> None:
     pass
 
 class RecordLog:
@@ -121,7 +121,7 @@ class RecordLog:
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     fid = self._fid
     self._fid += 1
     self._messages.append(('open', fid, filename, mode, level, id))
@@ -140,7 +140,7 @@ class RecordLog:
     finally:
       self._messages.append(('close', fid, data))
 
-  def write(self, text: str, level: int) -> None:
+  def write(self, text: str, level: proto.Level) -> None:
     self._messages.append(('write', text, level))
 
   def replay(self, log: typing.Optional[proto.Log] = None) -> None:

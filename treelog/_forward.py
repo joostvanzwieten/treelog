@@ -40,12 +40,12 @@ class TeeLog:
     self._baselog1.recontext(title)
     self._baselog2.recontext(title)
 
-  def write(self, text: str, level: int) -> None:
+  def write(self, text: str, level: proto.Level) -> None:
     self._baselog1.write(text, level)
     self._baselog2.write(text, level)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     with self._baselog1.open(filename, mode, level, id) as f1, self._baselog2.open(filename, mode, level, id) as f2:
       if not f1:
         yield f2
@@ -70,7 +70,7 @@ class TeeLog:
 class FilterLog:
   '''Filter messages based on level.'''
 
-  def __init__(self, baselog: proto.Log, minlevel: int) -> None:
+  def __init__(self, baselog: proto.Log, minlevel: proto.Level) -> None:
     self._baselog = baselog
     self._minlevel = minlevel
 
@@ -83,11 +83,11 @@ class FilterLog:
   def recontext(self, title: str) -> None:
     self._baselog.recontext(title)
 
-  def write(self, text: str, level: int) -> None:
-    if level >= self._minlevel:
+  def write(self, text: str, level: proto.Level) -> None:
+    if level.value >= self._minlevel.value:
       self._baselog.write(text, level)
 
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
-    return self._baselog.open(filename, mode, level, id) if level >= self._minlevel else _io.devnull()
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
+    return self._baselog.open(filename, mode, level, id) if level.value >= self._minlevel.value else _io.devnull()
 
 # vim:sw=2:sts=2:et

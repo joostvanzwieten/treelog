@@ -50,19 +50,19 @@ class ContextLog:
   def contextchangedhook(self) -> None:
     pass
 
-  def write(self, text: str, level: int) -> None:
+  def write(self, text: str, level: proto.Level) -> None:
     # This function exists solely to make mypy happy.
     raise NotImplementedError
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     yield _io.devnull()
     self.write(filename, level=level)
 
 class StdoutLog(ContextLog):
   '''Output plain text to stream.'''
 
-  def write(self, text: str, level: int) -> None:
+  def write(self, text: str, level: proto.Level) -> None:
     print(' > '.join((*self.currentcontext, text)))
 
 class RichOutputLog(ContextLog):
@@ -98,8 +98,8 @@ class RichOutputLog(ContextLog):
     sys.stdout.flush()
     self._current = _current
 
-  def write(self, text: str, level: int) -> None:
-    sys.stdout.write(''.join([self._cmap[level], text, '\033[0m\n', self._current]))
+  def write(self, text: str, level: proto.Level) -> None:
+    sys.stdout.write(''.join([self._cmap[level.value], text, '\033[0m\n', self._current]))
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
@@ -110,8 +110,8 @@ class LoggingLog(ContextLog):
     self._logger = logging.getLogger(name)
     super().__init__()
 
-  def write(self, text: str, level: int) -> None:
-    self._logger.log(self._levels[level], ' > '.join((*self.currentcontext, text)))
+  def write(self, text: str, level: proto.Level) -> None:
+    self._logger.log(self._levels[level.value], ' > '.join((*self.currentcontext, text)))
 
 def _first(items: typing.Iterable[bool]) -> int:
   'return index of first truthy item, or len(items) of all items are falsy'

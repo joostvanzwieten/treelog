@@ -18,7 +18,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import typing, typing_extensions
+import typing, typing_extensions, enum
+
+class Level(enum.Enum):
+
+  debug = 0
+  info = 1
+  user = 2
+  warning = 3
+  error = 4
 
 class IO(typing_extensions.Protocol[typing.AnyStr]):
 
@@ -35,7 +43,7 @@ class Log(typing_extensions.Protocol):
   def pushcontext(self, title: str) -> None: ...
   def popcontext(self) -> None: ...
   def recontext(self, title: str) -> None: ...
-  def write(self, text: str, level: int) -> None: ...
-  def open(self, filename: str, mode: str, level: int, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[IO]: ...
+  def write(self, text: str, level: Level) -> None: ...
+  def open(self, filename: str, mode: str, level: Level, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[IO]: ...
 
 # vim:sw=2:sts=2:et
