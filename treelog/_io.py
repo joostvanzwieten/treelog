@@ -18,53 +18,82 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, hashlib, tempfile as _tempfile, functools
+import io, os, contextlib, random, hashlib, functools, typing, types, sys
+from . import proto
 
-virtual_filename_prefix = '<treelog>' + os.sep
 supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink, os.mkdir}
+
+class devnull:
+  '''File-like data sink.'''
+
+  _fileno = os.open(os.devnull, os.O_WRONLY) # type: typing.ClassVar[int]
+
+  def __bool__(self) -> bool:
+    return False
+
+  def fileno(self) -> int:
+    return self._fileno
+
+  def readable(self) -> bool:
+    return False
+
+  def read(self, n: int = 0) -> typing.AnyStr:
+    raise io.UnsupportedOperation('not readable')
+
+  def writable(self) -> bool:
+    return True
+
+  def write(self, item: typing.AnyStr) -> int:
+    return len(item)
+
+  def seekable(self) -> bool:
+    return False
+
+  def seek(self, *args) -> int:
+    raise io.UnsupportedOperation('not seekable')
+
+  def __enter__(self) -> 'devnull':
+    return self
+
+  def __exit__(self, t: typing.Optional[typing.Type[BaseException]], value: typing.Optional[BaseException], traceback: typing.Optional[types.TracebackType]) -> None:
+    pass
 
 class directory:
   '''Directory with support for dir_fd.'''
 
-  def __init__(self, path):
+  def __init__(self, path: str) -> None:
     os.makedirs(path, exist_ok=True)
     if supports_fd:
-      self._fd = os.open(path, flags=os.O_RDONLY) # convert to file descriptor
-      self._path = None
+      # convert to file descriptor
+      self._fd = os.open(path, flags=os.O_RDONLY) # type: typing.Optional[int]
+      self._path = None # type: typing.Optional[str]
     else:
       self._fd = None
       self._path = path
-    self._rng = None
+    self._rng = None # type: typing.Optional[random.Random]
 
-  def _join(self, name):
+  def _join(self, name: str) -> str:
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename, mode, *, encoding=None, name=None, umask=0o666):
-    if mode == 'w' or mode == 'w+':
-      wrapper = functools.partial(io.TextIOWrapper, encoding=encoding)
-    elif mode == 'wb':
-      wrapper = io.BufferedWriter
-    elif mode == 'wb+':
-      wrapper = io.BufferedRandom
-    else:
+  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Union[typing.IO, devnull]:
+    if mode not in ('w', 'wb'):
       raise ValueError('invalid mode: {!r}'.format(mode))
-    flags = os.O_CREAT | os.O_EXCL
-    if '+' in mode:
-      flags |= os.O_RDWR
-    else:
-      flags |= os.O_WRONLY
-    if 'b' in mode and hasattr(os, 'O_BINARY'):
-      flags |= os.O_BINARY
     try:
-      fd = os.open(self._join(filename), flags=flags, mode=umask, dir_fd=self._fd)
+      return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
     except FileExistsError:
-      return devnull(name or filename)
-    else:
-      f = io.FileIO(fd, mode)
-      f.name = virtual_filename_prefix + (name or filename)
-      return wrapper(f)
+      return devnull()
 
-  def hash(self, filename, hashtype):
+  def openfirstunused(self, filenames: typing.Iterable[str], mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Tuple[typing.IO, str]:
+    if mode not in ('w', 'wb'):
+      raise ValueError('invalid mode: {!r}'.format(mode))
+    for filename in filenames:
+      try:
+        return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd)), filename
+      except FileExistsError:
+        pass
+    raise ValueError('all filenames are in use')
+
+  def hash(self, filename: str, hashtype: str) -> bytes:
     h = hashlib.new(hashtype)
     blocksize = 65536
     fd = os.open(self._join(filename), os.O_RDONLY | getattr(os, 'O_BINARY', 0), dir_fd=self._fd)
@@ -77,16 +106,16 @@ class directory:
       os.close(fd)
     return h.digest()
 
-  def temp(self, mode, *, name=None):
+  def temp(self, mode: str) -> typing.Tuple[typing.Union[typing.IO, devnull], str]:
     if not self._rng:
       self._rng = random.Random()
     while True:
       tmpname = ''.join(self._rng.choice('abcdefghijklmnopqrstuvwxyz0123456789_') for dummy in range(8))
-      f = self.open(tmpname, mode, name=name)
+      f = self.open(tmpname, mode)
       if f:
         return f, tmpname
 
-  def mkdir(self, path):
+  def mkdir(self, path: str) -> bool:
     try:
       os.mkdir(self._join(path), dir_fd=self._fd)
     except FileExistsError:
@@ -94,7 +123,7 @@ class directory:
     else:
       return True
 
-  def link(self, src, dst):
+  def link(self, src: str, dst: str) -> bool:
     try:
       os.link(self._join(src), self._join(dst), src_dir_fd=self._fd, dst_dir_fd=self._fd)
     except FileExistsError:
@@ -102,7 +131,13 @@ class directory:
     else:
       return True
 
-  def unlink(self, filename):
+  def linkfirstunused(self, src: str, dsts: typing.Iterable[str]) -> str:
+    for dst in dsts:
+      if self.link(src, dst):
+        return dst
+    raise ValueError('all destinations are in use')
+
+  def unlink(self, filename: str) -> bool:
     try:
       os.unlink(self._join(filename), dir_fd=self._fd)
     except FileNotFoundError:
@@ -110,50 +145,11 @@ class directory:
     else:
       return True
 
-  def __del__(self):
+  def __del__(self) -> None:
     if os and os.close and self._fd is not None:
       os.close(self._fd)
 
-@contextlib.contextmanager
-def tempfile(name, mode):
-  '''Temporary file with virtual name.'''
-
-  text = 'b' not in mode
-  fd, path = _tempfile.mkstemp(text=text)
-  if '+' not in mode:
-    mode += '+'
-  try:
-    f = io.FileIO(fd, mode)
-    f.name = virtual_filename_prefix + name
-    with io.TextIOWrapper(f) if text else io.BufferedRandom(f) as w:
-      yield w
-  finally:
-    os.unlink(path)
-
-class devnull(io.IOBase):
-  '''File-like data sink.'''
-
-  _fileno = os.open(os.devnull, os.O_WRONLY)
-
-  def __init__(self, name):
-    self.name = virtual_filename_prefix + name
-
-  def __bool__(self):
-    return False
-
-  def writable(self):
-    return True
-
-  def write(self, item):
-    pass
-
-  def fileno(self):
-    return self._fileno
-
-  def seek(self, *args):
-    return 0
-
-def sequence(filename):
+def sequence(filename: str) -> typing.Generator[str, None, None]:
   '''Generate file names a.b, a-1.b, a-2.b, etc.'''
 
   yield filename
@@ -163,9 +159,9 @@ def sequence(filename):
     yield '-{}'.format(i).join(splitext)
     i += 1
 
-def set_ansi_console():
-  import platform
-  if platform.system() == 'Windows':
+def set_ansi_console() -> None:
+  if sys.platform == "win32":
+    import platform
     if platform.version() < '10.':
       raise RuntimeError('ANSI console mode requires Windows 10 or higher, detected {}'.format(platform.version()))
     import ctypes

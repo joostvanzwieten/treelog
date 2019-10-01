@@ -18,34 +18,34 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib
-from . import _base, _io
+import contextlib, typing, typing_extensions, tempfile, warnings
+from . import proto, _io
 
-class TeeLog(_base.Log):
+class TeeLog:
   '''Forward messages to two underlying loggers.'''
 
-  def __init__(self, baselog1, baselog2):
+  def __init__(self, baselog1: proto.Log, baselog2: proto.Log) -> None:
     self._baselog1 = baselog1
     self._baselog2 = baselog2
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     self._baselog1.pushcontext(title)
     self._baselog2.pushcontext(title)
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     self._baselog1.popcontext()
     self._baselog2.popcontext()
 
-  def recontext(self, title):
+  def recontext(self, title: str) -> None:
     self._baselog1.recontext(title)
     self._baselog2.recontext(title)
 
-  def write(self, text, level):
+  def write(self, text: str, level: proto.Level) -> None:
     self._baselog1.write(text, level)
     self._baselog2.write(text, level)
 
   @contextlib.contextmanager
-  def open(self, filename, mode, level, id):
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     with self._baselog1.open(filename, mode, level, id) as f1, self._baselog2.open(filename, mode, level, id) as f2:
       if not f1:
         yield f2
@@ -60,34 +60,38 @@ class TeeLog(_base.Log):
         f1.seek(0)
         f2.write(f1.read())
       else:
-        with _io.tempfile(filename, mode) as tmp:
+        with tempfile.TemporaryFile(mode+'+') as tmp:
           yield tmp
           tmp.seek(0)
           data = tmp.read()
         f1.write(data)
         f2.write(data)
 
-class FilterLog(_base.Log):
+class FilterLog:
   '''Filter messages based on level.'''
 
-  def __init__(self, baselog, minlevel):
+  def __init__(self, baselog: proto.Log, minlevel: typing.Union[proto.Level, int]) -> None:
     self._baselog = baselog
-    self._minlevel = minlevel
+    if isinstance(minlevel, int):
+      warnings.warn('minlevel of type "int" is deprecated, use "proto.Level" instead', DeprecationWarning)
+      self._minlevel = tuple(proto.Level)[minlevel] # type: proto.Level
+    else:
+      self._minlevel = minlevel
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     self._baselog.pushcontext(title)
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     self._baselog.popcontext()
 
-  def recontext(self, title):
+  def recontext(self, title: str) -> None:
     self._baselog.recontext(title)
 
-  def write(self, text, level):
-    if level >= self._minlevel:
+  def write(self, text: str, level: proto.Level) -> None:
+    if level.value >= self._minlevel.value:
       self._baselog.write(text, level)
 
-  def open(self, filename, mode, level, id):
-    return self._baselog.open(filename, mode, level, id) if level >= self._minlevel else _io.devnull(filename)
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
+    return self._baselog.open(filename, mode, level, id) if level.value >= self._minlevel.value else _io.devnull()
 
 # vim:sw=2:sts=2:et

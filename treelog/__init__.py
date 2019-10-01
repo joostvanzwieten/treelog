@@ -20,19 +20,24 @@
 
 version = '1.0b5'
 
-import sys, functools, contextlib
+import sys, functools, contextlib, typing, typing_extensions
 
-from . import iter
-from ._base import Log
+from . import iter, proto
 from ._forward import TeeLog, FilterLog
 from ._silent import NullLog, DataLog, RecordLog
 from ._text import StdoutLog, RichOutputLog, LoggingLog
 from ._html import HtmlLog
 
-current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=1)
+for _log in TeeLog, FilterLog, NullLog, DataLog, RecordLog, StdoutLog, RichOutputLog, LoggingLog, HtmlLog:
+  _log.__module__ = __name__
+del _log
+
+Log = None # For backwards compatibility.
+
+current = FilterLog(TeeLog(StdoutLog(), DataLog()), minlevel=proto.Level.info) # type: proto.Log
 
 @contextlib.contextmanager
-def set(logger):
+def set(logger: proto.Log) -> typing.Generator[proto.Log, None, None]:
   '''Set logger as current.'''
 
   global current
@@ -43,18 +48,18 @@ def set(logger):
   finally:
     current = old
 
-def add(logger):
+def add(logger: proto.Log) -> typing_extensions.ContextManager[proto.Log]:
   '''Add logger to current.'''
 
   return set(TeeLog(current, logger))
 
-def disable():
+def disable() -> typing_extensions.ContextManager[proto.Log]:
   '''Disable logger.'''
 
   return set(NullLog())
 
 @contextlib.contextmanager
-def context(title, *initargs, **initkwargs):
+def context(title: str, *initargs: typing.Any, **initkwargs: typing.Any) -> typing.Generator[typing.Optional[typing.Callable[..., None]], None, None]:
   '''Enterable context.
 
   Returns an enterable object which upon enter creates a context with a given
@@ -64,7 +69,7 @@ def context(title, *initargs, **initkwargs):
 
   log = current
   if initargs or initkwargs:
-    reformat = _compose(log.recontext, title.format)
+    reformat = lambda *args, **kwargs: log.recontext(title.format(*args, **kwargs)) # type: typing.Optional[typing.Callable[..., None]]
     title = title.format(*initargs, **initkwargs)
   else:
     reformat = None
@@ -74,12 +79,7 @@ def context(title, *initargs, **initkwargs):
   finally:
     log.popcontext()
 
-def _compose(f, g):
-  '''Return composition of two callables.'''
-
-  return lambda *args, **kwargs: f(g(*args, **kwargs))
-
-def withcontext(f):
+def withcontext(f: typing.Callable[..., typing.Any]) -> typing.Callable[..., typing.Any]:
   '''Decorator; executes the wrapped function in its own logging context.'''
 
   @functools.wraps(f)
@@ -88,37 +88,46 @@ def withcontext(f):
       return f(*args, **kwargs)
   return wrapped
 
-def _print(level, *args, sep=' '):
-  '''Write message to log.
+class _Print:
 
-  Args
-  ----
-  *args : tuple of :class:`str`
-      Values to be printed to the log.
-  sep : :class:`str`
-      String inserted between values, default a space.
-  '''
-  current.write(sep.join(map(str, args)), level)
+  def __init__(self, level: proto.Level) -> None:
+    self._level = level # type: typing_extensions.Final[proto.Level]
 
-@contextlib.contextmanager
-def _file(level, name, mode, *, id=None):
-  '''Open file in logger-controlled directory.
+  def __call__(self, *args: typing.Any, sep: str = ' ') -> None:
+    '''Write message to log.
 
-  Args
-  ----
-  filename : :class:`str`
-  mode : :class:`str`
-      Should be either ``'w'`` (text) or ``'wb'`` (binary data).
-  id :
-      Bytes identifier that can be used to decide a priori that a file has
-      already been constructed. Default: None.
-  '''
-  with current.open(name, mode, level, id) as f, context(name):
-    yield f
+    Args
+    ----
+    *args : tuple of :class:`str`
+        Values to be printed to the log.
+    sep : :class:`str`
+        String inserted between values, default a space.
+    '''
+    current.write(sep.join(map(str, args)), self._level)
 
-debug, info, user, warning, error = [functools.partial(_print, level) for level in range(5)]
-debugfile, infofile, userfile, warningfile, errorfile = [functools.partial(_file, level) for level in range(5)]
+  @typing.overload
+  def open(self, name: str, mode: typing_extensions.Literal['w'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[str]]: ...
+  @typing.overload
+  def open(self, name: str, mode: typing_extensions.Literal['wb'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[bytes]]: ...
+  @typing.overload
+  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]: ...
+  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]:
+    '''Open file in logger-controlled directory.
 
-del _print, _file
+    Args
+    ----
+    filename : :class:`str`
+    mode : :class:`str`
+        Should be either ``'w'`` (text) or ``'wb'`` (binary data).
+    id :
+        Bytes identifier that can be used to decide a priori that a file has
+        already been constructed. Default: None.
+    '''
+    if mode not in ('w', 'wb'):
+      raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
+    return current.open(name, mode, self._level, id)
+
+debug, info, user, warning, error = map(_Print, proto.Level)
+debugfile, infofile, userfile, warningfile, errorfile = debug.open, info.open, user.open, warning.open, error.open
 
 # vim:sw=2:sts=2:et

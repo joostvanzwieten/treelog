@@ -18,18 +18,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, sys, os, urllib.parse, html, hashlib, warnings
-from . import _base, _io
+import contextlib, sys, os, urllib.parse, html, hashlib, warnings, typing, types
+from . import proto, _io
 
-class HtmlLog(_base.Log):
+class HtmlLog:
   '''Output html nested lists.'''
 
-  def __init__(self, dirpath, *, filename='log.html', title=None, htmltitle=None, favicon=None):
+  def __init__(self, dirpath: str, *, filename: str = 'log.html', title: typing.Optional[str] = None, htmltitle: typing.Optional[str] = None, favicon: typing.Optional[str] = None) -> None:
     self._dir = _io.directory(dirpath)
-    for self.filename in _io.sequence(filename):
-      self._file = self._dir.open(self.filename, 'w', encoding='utf-8')
-      if self._file:
-        break
+    self._file, self.filename = self._dir.openfirstunused(_io.sequence(filename), 'w', encoding='utf-8')
     css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
     with self._dir.open(css, 'w') as f:
       f.write(CSS)
@@ -43,35 +40,45 @@ class HtmlLog(_base.Log):
     if favicon is None:
       favicon = FAVICON
     self._file.write(HTMLHEAD.format(title=title, htmltitle=htmltitle, css=css, js=js, favicon=favicon))
-    self._unopened = [] # active contexts that are not yet opened as html elements
+    # active contexts that are not yet opened as html elements
+    self._unopened = [] # type: typing.List[str]
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     self._unopened.append(title)
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     if self._unopened:
       self._unopened.pop()
     else:
       print('</div><div class="end"></div></div>', file=self._file)
 
-  def write(self, text, level, escape=True):
+  def recontext(self, title: str) -> None:
+    self.popcontext()
+    self.pushcontext(title)
+
+  def write(self, text: str, level: typing.Union[proto.Level, int], escape: bool = True) -> None:
+    if isinstance(level, int):
+      warnings.warn('minlevel of type "int" is deprecated, use "proto.Level" instead', DeprecationWarning)
+      levelvalue = level
+    else:
+      levelvalue = level.value
     for c in self._unopened:
       print('<div class="context"><div class="title">{}</div><div class="children">'.format(html.escape(c)), file=self._file)
     self._unopened.clear()
     if escape:
       text = html.escape(text)
-    print('<div class="item" data-loglevel="{}">{}</div>'.format(level, text), file=self._file, flush=True)
+    print('<div class="item" data-loglevel="{}">{}</div>'.format(levelvalue, text), file=self._file, flush=True)
 
   @contextlib.contextmanager
-  def open(self, filename, mode, level, id):
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
     base, ext = os.path.splitext(filename)
     try:
       f = None
       if id:
         fname = id.hex() + ext
-        f = self._dir.open(fname, mode, name=filename)
+        f = self._dir.open(fname, mode)
       else:
-        f, fname = self._dir.temp(mode, name=filename)
+        f, fname = self._dir.temp(mode)
       with f:
         yield f
     except:
@@ -86,19 +93,21 @@ class HtmlLog(_base.Log):
       self._dir.unlink(fname)
     self.write('<a href="{href}" download="{name}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
 
-  def close(self):
+  def close(self) -> bool:
     if hasattr(self, '_file') and not self._file.closed:
       self._file.write(HTMLFOOT)
       self._file.close()
       return True
+    else:
+      return False
 
-  def __enter__(self):
+  def __enter__(self) -> 'HtmlLog':
     return self
 
-  def __exit__(self, *args):
+  def __exit__(self, t: typing.Optional[typing.Type[BaseException]], value: typing.Optional[BaseException], traceback: typing.Optional[types.TracebackType]) -> None:
     self.close()
 
-  def __del__(self):
+  def __del__(self) -> None:
     if self.close():
       warnings.warn('unclosed object {!r}'.format(self), ResourceWarning)
 

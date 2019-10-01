@@ -18,10 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import contextlib, logging, sys
-from . import _base, _io
+import contextlib, logging, sys, typing
+from . import proto, _io
 
-class ContextLog(_base.Log):
+class ContextLog:
   '''Base class for loggers that keep track of the current list of contexts.
 
   The base class implements :meth:`context` and :meth:`open` which keep the
@@ -32,35 +32,38 @@ class ContextLog(_base.Log):
      A :class:`list` of contexts (:class:`str`\\s) that are currently active.
   '''
 
-  def __init__(self):
-    self.currentcontext = []
+  def __init__(self) -> None:
+    self.currentcontext = [] # type: typing.List[str]
 
-  def pushcontext(self, title):
+  def pushcontext(self, title: str) -> None:
     self.currentcontext.append(title)
     self.contextchangedhook()
 
-  def popcontext(self):
+  def popcontext(self) -> None:
     self.currentcontext.pop()
     self.contextchangedhook()
 
-  def recontext(self, title):
+  def recontext(self, title: str) -> None:
     self.currentcontext[-1] = title
     self.contextchangedhook()
 
-  def contextchangedhook(self):
+  def contextchangedhook(self) -> None:
     pass
 
+  def write(self, text: str, level: proto.Level) -> None:
+    # This function exists solely to make mypy happy.
+    raise NotImplementedError
+
   @contextlib.contextmanager
-  def open(self, filename, mode, level, id):
-    with _io.devnull(filename) as f:
-      yield f
+  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+    yield _io.devnull()
     self.write(filename, level=level)
 
 class StdoutLog(ContextLog):
   '''Output plain text to stream.'''
 
-  def write(self, text, level):
-    print(*self.currentcontext, text, sep=' > ')
+  def write(self, text: str, level: proto.Level) -> None:
+    print(' > '.join((*self.currentcontext, text)))
 
 class RichOutputLog(ContextLog):
   '''Output rich (colored,unicode) text to stream.'''
@@ -72,12 +75,12 @@ class RichOutputLog(ContextLog):
     '\033[1;35m', # warning: bold purple
     '\033[1;31m') # error: bold red
 
-  def __init__(self):
+  def __init__(self) -> None:
     super().__init__()
     self._current = '' # currently printed context
     _io.set_ansi_console()
 
-  def contextchangedhook(self):
+  def contextchangedhook(self) -> None:
     _current = ''.join(item + ' > ' for item in self.currentcontext)
     if _current == self._current:
       return
@@ -95,22 +98,22 @@ class RichOutputLog(ContextLog):
     sys.stdout.flush()
     self._current = _current
 
-  def write(self, text, level):
-    sys.stdout.write(''.join([self._cmap[level], text, '\033[0m\n', self._current]))
+  def write(self, text: str, level: proto.Level) -> None:
+    sys.stdout.write(''.join([self._cmap[level.value], text, '\033[0m\n', self._current]))
 
 class LoggingLog(ContextLog):
   '''Log to Python's built-in logging facility.'''
 
-  _levels = logging.DEBUG, logging.INFO, 25, logging.WARNING, logging.ERROR
+  _levels = logging.DEBUG, logging.INFO, 25, logging.WARNING, logging.ERROR # type: typing.ClassVar[typing.Tuple[int, int, int, int, int]]
 
-  def __init__(self, name='nutils'):
+  def __init__(self, name: str = 'nutils') -> None:
     self._logger = logging.getLogger(name)
     super().__init__()
 
-  def write(self, text, level):
-    self._logger.log(self._levels[level], ' > '.join((*self.currentcontext, text)))
+  def write(self, text: str, level: proto.Level) -> None:
+    self._logger.log(self._levels[level.value], ' > '.join((*self.currentcontext, text)))
 
-def _first(items):
+def _first(items: typing.Iterable[bool]) -> int:
   'return index of first truthy item, or len(items) of all items are falsy'
   i = 0
   for item in items:
