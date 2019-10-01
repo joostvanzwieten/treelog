@@ -26,10 +26,7 @@ class HtmlLog:
 
   def __init__(self, dirpath: str, *, filename: str = 'log.html', title: typing.Optional[str] = None, htmltitle: typing.Optional[str] = None, favicon: typing.Optional[str] = None) -> None:
     self._dir = _io.directory(dirpath)
-    for self.filename in _io.sequence(filename):
-      self._file = self._dir.open(self.filename, 'w', encoding='utf-8')
-      if self._file:
-        break
+    self._file, self.filename = self._dir.openfirstunused(_io.sequence(filename), 'w', encoding='utf-8')
     css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
     with self._dir.open(css, 'w') as f:
       f.write(CSS)

@@ -52,13 +52,6 @@ class devnull:
   def seek(self, *args) -> int:
     raise io.UnsupportedOperation('not seekable')
 
-  @property
-  def closed(self) -> bool:
-    return False
-
-  def close(self) -> None:
-    pass
-
   def __enter__(self) -> 'devnull':
     return self
 
@@ -89,6 +82,16 @@ class directory:
       return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
     except FileExistsError:
       return devnull()
+
+  def openfirstunused(self, filenames: typing.Iterable[str], mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Tuple[typing.IO, str]:
+    if mode not in ('w', 'wb'):
+      raise ValueError('invalid mode: {!r}'.format(mode))
+    for filename in filenames:
+      try:
+        return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd)), filename
+      except FileExistsError:
+        pass
+    raise ValueError('all filenames are in use')
 
   def hash(self, filename: str, hashtype: str) -> bytes:
     h = hashlib.new(hashtype)
@@ -127,6 +130,12 @@ class directory:
       return False
     else:
       return True
+
+  def linkfirstunused(self, src: str, dsts: typing.Iterable[str]) -> str:
+    for dst in dsts:
+      if self.link(src, dst):
+        return dst
+    raise ValueError('all destinations are in use')
 
   def unlink(self, filename: str) -> bool:
     try:

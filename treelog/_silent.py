@@ -61,9 +61,7 @@ class DataLog:
       if f:
         self._dir.unlink(fname)
       raise
-    for realname in self._names(filename):
-      if self._dir.link(fname, realname):
-        break
+    self._dir.linkfirstunused(fname, self._names(filename))
     if id is None:
       self._dir.unlink(fname)
 

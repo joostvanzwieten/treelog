@@ -251,6 +251,18 @@ class HtmlLog(Log):
           raise RuntimeError
       self.assertEqual(len(os.listdir(tmpdir)), 3)
 
+  def test_filename_sequence(self):
+    with tempfile.TemporaryDirectory() as tmpdir:
+      with silent(), treelog.HtmlLog(tmpdir) as log:
+        pass
+      self.assertTrue(os.path.exists(os.path.join(tmpdir, 'log.html')))
+      with silent(), treelog.HtmlLog(tmpdir) as log:
+        pass
+      self.assertTrue(os.path.exists(os.path.join(tmpdir, 'log-1.html')))
+      with silent(), treelog.HtmlLog(tmpdir) as log:
+        pass
+      self.assertTrue(os.path.exists(os.path.join(tmpdir, 'log-2.html')))
+
 class RecordLog(Log):
 
   @contextlib.contextmanager
