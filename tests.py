@@ -75,7 +75,7 @@ class StdoutLog(Log):
       'my context > iter 3 > c\n'
       'my context > multiple..\n'
       '  ..lines\n'
-      'my context > test.dat > generating\n'
+      'my context > generating\n'
       'my context > test.dat\n'
       'generate_id > test.dat\n'
       'same\n'
@@ -91,8 +91,6 @@ class RichOutputLog(Log):
       yield treelog.RichOutputLog()
     self.assertEqual(captured.stdout,
       '\x1b[1;34mmy message\x1b[0m\n'
-      'test.dat > '
-      '\r\x1b[K'
       '\x1b[1mtest.dat\x1b[0m\n'
       'my context > '
       'iter 0 > '
@@ -106,21 +104,13 @@ class RichOutputLog(Log):
       'empty > '
       '\x1b[8D\x1b[K'
       '\x1b[1;31mmultiple..\n  ..lines\x1b[0m\nmy context > '
-      'test.dat > '
-      '\x1b[1mgenerating\x1b[0m\nmy context > test.dat > '
-      '\x1b[11D\x1b[K'
+      '\x1b[1mgenerating\x1b[0m\nmy context > '
       '\x1b[1;34mtest.dat\x1b[0m\nmy context > '
       '\r\x1b[K'
       'generate_id > '
-      'test.dat > '
-      '\x1b[11D\x1b[K'
       '\x1b[1;35mtest.dat\x1b[0m\ngenerate_id > '
       '\r\x1b[K'
-      'same > '
-      '\r\x1b[K'
       '\x1b[1;31msame\x1b[0m\n'
-      'dbg.dat > '
-      '\r\x1b[K'
       '\x1b[1;30mdbg.dat\x1b[0m\n'
       '\x1b[1;30mdbg\x1b[0m\n'
       '\x1b[1;35mwarn\x1b[0m\n')
@@ -218,9 +208,7 @@ class HtmlLog(Log):
         '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4">multiple..\n',
         '  ..lines</div>\n',
-        '<div class="context"><div class="title">test.dat</div><div class="children">\n',
         '<div class="item" data-loglevel="1">generating</div>\n',
-        '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="2"><a href="109f4b3c50d7b0df729d299bc6f8e9ef9066971f.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
         '<div class="context"><div class="title">generate_id</div><div class="children">\n',
@@ -291,8 +279,6 @@ class RecordLog(Log):
     self.assertEqual(recordlog._messages, [
       ('write', 'my message', treelog.proto.Level.user),
       ('open', 0, 'test.dat', 'w', treelog.proto.Level.info, None),
-      ('pushcontext', 'test.dat'),
-      ('popcontext',),
       ('close', 0, 'test1'),
       ('pushcontext', 'my context'),
       ('pushcontext', 'iter 0'),
@@ -307,24 +293,16 @@ class RecordLog(Log):
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', treelog.proto.Level.error),
       ('open', 1, 'test.dat', 'wb', treelog.proto.Level.user, None),
-      ('pushcontext', 'test.dat'),
       ('write', 'generating', treelog.proto.Level.info),
-      ('popcontext',),
       ('close', 1, b'test2'),
       ('popcontext',),
       ('pushcontext', 'generate_id'),
       ('open', 2, 'test.dat', 'wb', treelog.proto.Level.warning, b'abc'),
-      ('pushcontext', 'test.dat'),
-      ('popcontext',),
       ('close', 2, b'test3'),
       ('popcontext',),
       ('open', 3, 'same', 'wb', treelog.proto.Level.error, b'abc'),
-      ('pushcontext', 'same'),
-      ('popcontext',),
       ('close', 3, b'test3'),
       ('open', 4, 'dbg.dat', 'wb', treelog.proto.Level.debug, None),
-      ('pushcontext', 'dbg.dat'),
-      ('popcontext',),
       ('close', 4, b'test4'),
       ('write', 'dbg', treelog.proto.Level.debug),
       ('write', 'warn', treelog.proto.Level.warning)])
@@ -358,9 +336,7 @@ class SimplifiedRecordLog(Log):
       ('popcontext',),
       ('write', 'multiple..\n  ..lines', treelog.proto.Level.error),
       ('open', 1, 'test.dat', 'wb', treelog.proto.Level.user, None),
-      ('pushcontext', 'test.dat'),
       ('write', 'generating', treelog.proto.Level.info),
-      ('popcontext',),
       ('close', 1, b'test2'),
       ('recontext', 'generate_id'),
       ('open', 2, 'test.dat', 'wb', treelog.proto.Level.warning, b'abc'),
@@ -535,7 +511,7 @@ class LoggingLog(Log):
       'INFO:nutils:my context > iter 2 > b',
       'INFO:nutils:my context > iter 3 > c',
       'ERROR:nutils:my context > multiple..\n  ..lines',
-      'INFO:nutils:my context > test.dat > generating',
+      'INFO:nutils:my context > generating',
       'Level 25:nutils:my context > test.dat',
       'WARNING:nutils:generate_id > test.dat',
       'ERROR:nutils:same',

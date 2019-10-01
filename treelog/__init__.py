@@ -105,11 +105,6 @@ class _Print:
     '''
     current.write(sep.join(map(str, args)), self._level)
 
-  @contextlib.contextmanager
-  def _open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing.Generator[proto.IO, None, None]:
-    with current.open(name, mode, self._level, id) as f, context(name):
-      yield f
-
   @typing.overload
   def open(self, name: str, mode: typing_extensions.Literal['w'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[str]]: ...
   @typing.overload
@@ -130,7 +125,7 @@ class _Print:
     '''
     if mode not in ('w', 'wb'):
       raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
-    return self._open(name, mode, id=id)
+    return current.open(name, mode, self._level, id)
 
 debug, info, user, warning, error = map(_Print, proto.Level)
 debugfile, infofile, userfile, warningfile, errorfile = debug.open, info.open, user.open, warning.open, error.open
