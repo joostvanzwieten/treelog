@@ -18,10 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, hashlib, functools, typing, types, sys
+import io, os, contextlib, random, functools, typing, types, sys
 from . import proto
 
-supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink, os.mkdir}
+supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink}
 
 class devnull:
   '''File-like data sink.'''
@@ -70,80 +70,45 @@ class directory:
     else:
       self._fd = None
       self._path = path
-    self._rng = None # type: typing.Optional[random.Random]
+    self._rng = randomnames()
 
   def _join(self, name: str) -> str:
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Union[typing.IO, devnull]:
+  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.IO:
     if mode not in ('w', 'wb'):
       raise ValueError('invalid mode: {!r}'.format(mode))
-    try:
-      return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
-    except FileExistsError:
-      return devnull()
+    return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
 
   def openfirstunused(self, filenames: typing.Iterable[str], mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Tuple[typing.IO, str]:
-    if mode not in ('w', 'wb'):
-      raise ValueError('invalid mode: {!r}'.format(mode))
     for filename in filenames:
       try:
-        return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd)), filename
+        return self.open(filename, mode, encoding=encoding, umask=umask), filename
       except FileExistsError:
         pass
     raise ValueError('all filenames are in use')
 
-  def hash(self, filename: str, hashtype: str) -> bytes:
-    h = hashlib.new(hashtype)
-    blocksize = 65536
-    fd = os.open(self._join(filename), os.O_RDONLY | getattr(os, 'O_BINARY', 0), dir_fd=self._fd)
+  @contextlib.contextmanager
+  def temp(self, mode: str) -> typing.Generator[typing.IO, None, None]:
     try:
-      buf = os.read(fd, blocksize)
-      while buf:
-        h.update(buf)
-        buf = os.read(fd, blocksize)
+      f, name = self.openfirstunused(self._rng, mode)
+      with f:
+        yield f
     finally:
-      os.close(fd)
-    return h.digest()
+      os.unlink(f.name, dir_fd=self._fd)
 
-  def temp(self, mode: str) -> typing.Tuple[typing.Union[typing.IO, devnull], str]:
-    if not self._rng:
-      self._rng = random.Random()
-    while True:
-      tmpname = ''.join(self._rng.choice('abcdefghijklmnopqrstuvwxyz0123456789_') for dummy in range(8))
-      f = self.open(tmpname, mode)
-      if f:
-        return f, tmpname
+  def link(self, src: typing.IO, dst: str) -> None:
+    os.link(src.name, self._join(dst), src_dir_fd=self._fd, dst_dir_fd=self._fd)
 
-  def mkdir(self, path: str) -> bool:
-    try:
-      os.mkdir(self._join(path), dir_fd=self._fd)
-    except FileExistsError:
-      return False
-    else:
-      return True
-
-  def link(self, src: str, dst: str) -> bool:
-    try:
-      os.link(self._join(src), self._join(dst), src_dir_fd=self._fd, dst_dir_fd=self._fd)
-    except FileExistsError:
-      return False
-    else:
-      return True
-
-  def linkfirstunused(self, src: str, dsts: typing.Iterable[str]) -> str:
+  def linkfirstunused(self, src: typing.IO, dsts: typing.Iterable[str]) -> str:
     for dst in dsts:
-      if self.link(src, dst):
+      try:
+        self.link(src, dst)
+      except FileExistsError:
+        pass
+      else:
         return dst
     raise ValueError('all destinations are in use')
-
-  def unlink(self, filename: str) -> bool:
-    try:
-      os.unlink(self._join(filename), dir_fd=self._fd)
-    except FileNotFoundError:
-      return False
-    else:
-      return True
 
   def __del__(self) -> None:
     if os and os.close and self._fd is not None:
@@ -158,6 +123,11 @@ def sequence(filename: str) -> typing.Generator[str, None, None]:
   while True:
     yield '-{}'.format(i).join(splitext)
     i += 1
+
+def randomnames(characters='abcdefghijklmnopqrstuvwxyz0123456789_', length=8):
+  rng = random.Random()
+  while True:
+    yield ''.join(rng.choice(characters) for dummy in range(length))
 
 def set_ansi_console() -> None:
   if sys.platform == "win32":

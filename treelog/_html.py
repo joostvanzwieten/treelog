@@ -28,11 +28,17 @@ class HtmlLog:
     self._dir = _io.directory(dirpath)
     self._file, self.filename = self._dir.openfirstunused(_io.sequence(filename), 'w', encoding='utf-8')
     css = hashlib.sha1(CSS.encode()).hexdigest() + '.css'
-    with self._dir.open(css, 'w') as f:
-      f.write(CSS)
+    try:
+      with self._dir.open(css, 'w') as f:
+        f.write(CSS)
+    except FileExistsError:
+      pass
     js = hashlib.sha1(JS.encode()).hexdigest() + '.js'
-    with self._dir.open(js, 'w') as f:
-      f.write(JS)
+    try:
+      with self._dir.open(js, 'w') as f:
+        f.write(JS)
+    except FileExistsError:
+      pass
     if title is None:
       title = ' '.join(sys.argv)
     if htmltitle is None:
@@ -72,17 +78,14 @@ class HtmlLog:
   @contextlib.contextmanager
   def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
     base, ext = os.path.splitext(filename)
-    try:
-      f, fname = self._dir.temp(mode)
-      with f:
-        yield f
-    except:
-      if f:
-        self._dir.unlink(fname)
-      raise
-    realname = self._dir.hash(fname, 'sha1').hex() + ext
-    self._dir.link(fname, realname)
-    self._dir.unlink(fname)
+    with self._dir.temp(mode) as f:
+      yield f
+      f.seek(0)
+      realname = _filehash(f.fileno(), 'sha1').hex() + ext
+      try:
+        self._dir.link(f, realname)
+      except FileExistsError:
+        pass
     self.write('<a href="{href}" download="{name}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
 
   def close(self) -> bool:
@@ -775,5 +778,14 @@ FAVICON = 'data:image/png;base64,' \
   'AAAAAXRSTlMAQObYZgAAAFtJREFUaN7t2SEOACEMRcEa7ofh/ldBsJJAS1bO86Ob/MZY9ViN' \
   'TD0oiqIo6qrOURRFUVRepQ4TRVEURdXVV6MoiqKoV2UJpCiKov7+p1AURVFUWZWiKIqiqI2a' \
   '8O8qJ0n+GP4AAAAASUVORK5CYII='
+
+def _filehash(fd: int, hashtype: str) -> bytes:
+  h = hashlib.new(hashtype)
+  blocksize = 65536
+  buf = os.read(fd, blocksize)
+  while buf:
+    h.update(buf)
+    buf = os.read(fd, blocksize)
+  return h.digest()
 
 # vim:sw=2:sts=2:et
