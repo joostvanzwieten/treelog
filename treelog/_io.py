@@ -124,7 +124,7 @@ def sequence(filename: str) -> typing.Generator[str, None, None]:
     yield '-{}'.format(i).join(splitext)
     i += 1
 
-def randomnames(characters='abcdefghijklmnopqrstuvwxyz0123456789_', length=8):
+def randomnames(characters: str = 'abcdefghijklmnopqrstuvwxyz0123456789_', length: int = 8) -> typing.Generator[str, None, None]:
   rng = random.Random()
   while True:
     yield ''.join(rng.choice(characters) for dummy in range(length))
