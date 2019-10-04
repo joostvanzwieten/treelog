@@ -55,7 +55,7 @@ class ContextLog:
     raise NotImplementedError
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
     yield _io.devnull()
     self.write(filename, level=level)
 

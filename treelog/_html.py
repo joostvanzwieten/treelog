@@ -70,27 +70,19 @@ class HtmlLog:
     print('<div class="item" data-loglevel="{}">{}</div>'.format(levelvalue, text), file=self._file, flush=True)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
     base, ext = os.path.splitext(filename)
     try:
-      f = None
-      if id:
-        fname = id.hex() + ext
-        f = self._dir.open(fname, mode)
-      else:
-        f, fname = self._dir.temp(mode)
+      f, fname = self._dir.temp(mode)
       with f:
         yield f
     except:
       if f:
         self._dir.unlink(fname)
       raise
-    if id:
-      realname = fname
-    else:
-      realname = self._dir.hash(fname, 'sha1').hex() + ext
-      self._dir.link(fname, realname)
-      self._dir.unlink(fname)
+    realname = self._dir.hash(fname, 'sha1').hex() + ext
+    self._dir.link(fname, realname)
+    self._dir.unlink(fname)
     self.write('<a href="{href}" download="{name}">{name}</a>'.format(href=urllib.parse.quote(realname), name=html.escape(filename)), level, escape=False)
 
   def close(self) -> bool:
