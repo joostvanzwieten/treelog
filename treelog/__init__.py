@@ -106,12 +106,12 @@ class _Print:
     current.write(sep.join(map(str, args)), self._level)
 
   @typing.overload
-  def open(self, name: str, mode: typing_extensions.Literal['w'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[str]]: ...
+  def open(self, name: str, mode: typing_extensions.Literal['w']) -> typing_extensions.ContextManager[proto.IO[str]]: ...
   @typing.overload
-  def open(self, name: str, mode: typing_extensions.Literal['wb'], *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO[bytes]]: ...
+  def open(self, name: str, mode: typing_extensions.Literal['wb']) -> typing_extensions.ContextManager[proto.IO[bytes]]: ...
   @typing.overload
-  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]: ...
-  def open(self, name: str, mode: str, *, id: typing.Optional[bytes] = None) -> typing_extensions.ContextManager[proto.IO]:
+  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO]: ...
+  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO]:
     '''Open file in logger-controlled directory.
 
     Args
@@ -119,13 +119,10 @@ class _Print:
     filename : :class:`str`
     mode : :class:`str`
         Should be either ``'w'`` (text) or ``'wb'`` (binary data).
-    id :
-        Bytes identifier that can be used to decide a priori that a file has
-        already been constructed. Default: None.
     '''
     if mode not in ('w', 'wb'):
       raise ValueError("expected mode 'w' or 'wb' but got {!r}".format(mode))
-    return current.open(name, mode, self._level, id)
+    return current.open(name, mode, self._level)
 
 debug, info, user, warning, error = map(_Print, proto.Level)
 debugfile, infofile, userfile, warningfile, errorfile = debug.open, info.open, user.open, warning.open, error.open

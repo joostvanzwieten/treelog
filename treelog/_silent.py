@@ -35,7 +35,7 @@ class NullLog:
   def write(self, text: str , level: proto.Level) -> None:
     pass
 
-  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing_extensions.ContextManager[proto.IO]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO]:
     return _io.devnull()
 
 class DataLog:
@@ -46,24 +46,10 @@ class DataLog:
     self._dir = _io.directory(dirpath)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
-    f = None
-    try:
-      if id is None:
-        f, fname = self._dir.temp(mode)
-      else:
-        self._dir.mkdir('.id')
-        fname = os.path.join('.id', id.hex())
-        f = self._dir.open(fname, mode)
-      with f:
-        yield f
-    except:
-      if f:
-        self._dir.unlink(fname)
-      raise
-    self._dir.linkfirstunused(fname, self._names(filename))
-    if id is None:
-      self._dir.unlink(fname)
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
+    with self._dir.temp(mode) as f:
+      yield f
+      self._dir.linkfirstunused(f, self._names(filename))
 
   def pushcontext(self, title: str) -> None:
     pass
@@ -102,7 +88,6 @@ class RecordLog:
     self._simplify = simplify
     self._messages = [] # type: typing.List[typing.Any]
     self._fid = 0 # internal file counter
-    self._seen = {} # type: typing.Dict[bytes, typing.Union[str, bytes]]
 
   def pushcontext(self, title: str) -> None:
     if self._simplify and self._messages and self._messages[-1][0] == 'popcontext':
@@ -121,24 +106,16 @@ class RecordLog:
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level, id: typing.Optional[bytes]) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
     fid = self._fid
     self._fid += 1
-    self._messages.append(('open', fid, filename, mode, level, id))
-    try:
-      data = self._seen.get(id) if id else None # type: typing.Optional[typing.Union[str, bytes]]
-      if data is not None:
-        with _io.devnull() as f:
-          yield f
-      else:
-        with tempfile.TemporaryFile(mode+'+') as g:
-          yield g
-          g.seek(0)
-          data = g.read()
-        if id:
-          self._seen[id] = data
-    finally:
-      self._messages.append(('close', fid, data))
+    self._messages.append(('open', fid, filename, mode, level))
+    with tempfile.TemporaryFile(mode+'+') as g:
+      try:
+        yield g
+      finally:
+        g.seek(0)
+        self._messages.append(('close', fid, g.read()))
 
   def write(self, text: str, level: proto.Level) -> None:
     self._messages.append(('write', text, level))
@@ -163,8 +140,8 @@ class RecordLog:
       elif cmd == 'popcontext':
         log.popcontext()
       elif cmd == 'open':
-        fid, filename, mode, level, id = args
-        ctx = log.open(filename, mode, level=level, id=id)
+        fid, filename, mode, level = args
+        ctx = log.open(filename, mode, level=level)
         files[fid] = ctx, ctx.__enter__()
       elif cmd == 'close':
         fid, data = args
