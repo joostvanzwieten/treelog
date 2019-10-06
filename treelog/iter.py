@@ -44,7 +44,7 @@ class wrap(typing.Generic[T]):
     self._log.popcontext()
     self._log = None
 
-def plain(title: str, *args) -> wrap:
+def plain(title: str, *args: typing.Any) -> wrap[typing.Any]:
   '''Wrap arguments in simple enumerated contexts.
 
   Example: my context 1, my context 2, etc.
@@ -53,7 +53,7 @@ def plain(title: str, *args) -> wrap:
   titles = map((_escape(title) + ' {}').format, itertools.count())
   return wrap(titles, zip(*args) if len(args) > 1 else args[0])
 
-def fraction(title: str, *args, length: typing.Optional[int] = None) -> wrap:
+def fraction(title: str, *args: typing.Any, length: typing.Optional[int] = None) -> wrap[typing.Any]:
   '''Wrap arguments in enumerated contexts with length.
 
   Example: my context 1/5, my context 2/5, etc.
@@ -64,7 +64,7 @@ def fraction(title: str, *args, length: typing.Optional[int] = None) -> wrap:
   titles = map((_escape(title) + ' {}/' + str(length)).format, itertools.count())
   return wrap(titles, zip(*args) if len(args) > 1 else args[0])
 
-def percentage(title: str, *args, length: typing.Optional[int] = None) -> wrap:
+def percentage(title: str, *args: typing.Any, length: typing.Optional[int] = None) -> wrap[typing.Any]:
   '''Wrap arguments in contexts with percentage counter.
 
   Example: my context 5%, my context 10%, etc.
