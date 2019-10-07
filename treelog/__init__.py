@@ -79,11 +79,13 @@ def context(title: str, *initargs: typing.Any, **initkwargs: typing.Any) -> typi
   finally:
     log.popcontext()
 
-def withcontext(f: typing.Callable[..., typing.Any]) -> typing.Callable[..., typing.Any]:
+T = typing.TypeVar('T')
+
+def withcontext(f: typing.Callable[..., T]) -> typing.Callable[..., T]:
   '''Decorator; executes the wrapped function in its own logging context.'''
 
   @functools.wraps(f)
-  def wrapped(*args, **kwargs):
+  def wrapped(*args: typing.Any, **kwargs: typing.Any) -> T:
     with context(f.__name__):
       return f(*args, **kwargs)
   return wrapped
@@ -110,8 +112,8 @@ class _Print:
   @typing.overload
   def open(self, name: str, mode: typing_extensions.Literal['wb']) -> typing_extensions.ContextManager[proto.IO[bytes]]: ...
   @typing.overload
-  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO]: ...
-  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO]:
+  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO[typing.Any]]: ...
+  def open(self, name: str, mode: str) -> typing_extensions.ContextManager[proto.IO[typing.Any]]:
     '''Open file in logger-controlled directory.
 
     Args

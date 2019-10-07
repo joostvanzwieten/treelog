@@ -37,7 +37,7 @@ class devnull:
   def readable(self) -> bool:
     return False
 
-  def read(self, n: int = 0) -> typing.AnyStr:
+  def read(self, n: int = 0) -> typing.Any:
     raise io.UnsupportedOperation('not readable')
 
   def writable(self) -> bool:
@@ -49,7 +49,7 @@ class devnull:
   def seekable(self) -> bool:
     return False
 
-  def seek(self, *args) -> int:
+  def seek(self, *args: typing.Any) -> int:
     raise io.UnsupportedOperation('not seekable')
 
   def __enter__(self) -> 'devnull':
@@ -75,12 +75,12 @@ class directory:
   def _join(self, name: str) -> str:
     return name if self._path is None else os.path.join(self._path, name)
 
-  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.IO:
+  def open(self, filename: str, mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.IO[typing.Any]:
     if mode not in ('w', 'wb'):
       raise ValueError('invalid mode: {!r}'.format(mode))
     return open(self._join(filename), mode+'+', encoding=encoding, opener=lambda name, flags: os.open(name, flags|os.O_CREAT|os.O_EXCL, mode=umask, dir_fd=self._fd))
 
-  def openfirstunused(self, filenames: typing.Iterable[str], mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Tuple[typing.IO, str]:
+  def openfirstunused(self, filenames: typing.Iterable[str], mode: str, *, encoding: typing.Optional[str] = None, umask: int = 0o666) -> typing.Tuple[typing.IO[typing.Any], str]:
     for filename in filenames:
       try:
         return self.open(filename, mode, encoding=encoding, umask=umask), filename
@@ -89,7 +89,7 @@ class directory:
     raise ValueError('all filenames are in use')
 
   @contextlib.contextmanager
-  def temp(self, mode: str) -> typing.Generator[typing.IO, None, None]:
+  def temp(self, mode: str) -> typing.Generator[typing.IO[typing.Any], None, None]:
     try:
       f, name = self.openfirstunused(self._rng, mode)
       with f:
@@ -97,10 +97,10 @@ class directory:
     finally:
       os.unlink(f.name, dir_fd=self._fd)
 
-  def link(self, src: typing.IO, dst: str) -> None:
+  def link(self, src: typing.IO[typing.Any], dst: str) -> None:
     os.link(src.name, self._join(dst), src_dir_fd=self._fd, dst_dir_fd=self._fd)
 
-  def linkfirstunused(self, src: typing.IO, dsts: typing.Iterable[str]) -> str:
+  def linkfirstunused(self, src: typing.IO[typing.Any], dsts: typing.Iterable[str]) -> str:
     for dst in dsts:
       try:
         self.link(src, dst)
@@ -124,7 +124,7 @@ def sequence(filename: str) -> typing.Generator[str, None, None]:
     yield '-{}'.format(i).join(splitext)
     i += 1
 
-def randomnames(characters='abcdefghijklmnopqrstuvwxyz0123456789_', length=8):
+def randomnames(characters: str = 'abcdefghijklmnopqrstuvwxyz0123456789_', length: int = 8) -> typing.Generator[str, None, None]:
   rng = random.Random()
   while True:
     yield ''.join(rng.choice(characters) for dummy in range(length))

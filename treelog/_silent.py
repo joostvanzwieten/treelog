@@ -35,18 +35,18 @@ class NullLog:
   def write(self, text: str , level: proto.Level) -> None:
     pass
 
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO[typing.Any]]:
     return _io.devnull()
 
 class DataLog:
   '''Output only data.'''
 
-  def __init__(self, dirpath: str = os.curdir, names=_io.sequence) -> None:
+  def __init__(self, dirpath: str = os.curdir, names: typing.Callable[[str], typing.Iterable[str]] = _io.sequence) -> None:
     self._names = functools.lru_cache(maxsize=32)(names)
     self._dir = _io.directory(dirpath)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
     with self._dir.temp(mode) as f:
       yield f
       self._dir.linkfirstunused(f, self._names(filename))
@@ -106,7 +106,7 @@ class RecordLog:
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO, None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
     fid = self._fid
     self._fid += 1
     self._messages.append(('open', fid, filename, mode, level))
