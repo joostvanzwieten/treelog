@@ -70,7 +70,7 @@ class TeeLog:
 class FilterLog:
   '''Filter messages based on level.'''
 
-  def __init__(self, baselog: proto.Log, minlevel: typing.Union[proto.Level, int]) -> None:
+  def __init__(self, baselog: proto.Log, minlevel: proto.Level) -> None:
     self._baselog = baselog
     self._minlevel = minlevel
 
