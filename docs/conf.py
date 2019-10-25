@@ -4,6 +4,9 @@
 # list see the documentation:
 # http://www.sphinx-doc.org/en/master/config
 
+import sys, os
+sys.path.insert(0, os.path.abspath('..'))
+
 # -- Project information -----------------------------------------------------
 
 project = 'Treelog'
@@ -18,6 +21,8 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.napoleon',
 ]
+
+master_doc = 'index'
 
 # -- Options for HTML output -------------------------------------------------
 
