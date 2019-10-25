@@ -62,18 +62,13 @@ class HtmlLog:
     self.popcontext()
     self.pushcontext(title)
 
-  def write(self, text: str, level: typing.Union[proto.Level, int], escape: bool = True) -> None:
-    if isinstance(level, int):
-      warnings.warn('minlevel of type "int" is deprecated, use "proto.Level" instead', DeprecationWarning)
-      levelvalue = level
-    else:
-      levelvalue = level.value
+  def write(self, text: str, level: proto.Level, escape: bool = True) -> None:
     for c in self._unopened:
       print('<div class="context"><div class="title">{}</div><div class="children">'.format(html.escape(c)), file=self._file)
     self._unopened.clear()
     if escape:
       text = html.escape(text)
-    print('<div class="item" data-loglevel="{}">{}</div>'.format(levelvalue, text), file=self._file, flush=True)
+    print('<div class="item" data-loglevel="{}">{}</div>'.format(level.value, text), file=self._file, flush=True)
 
   @contextlib.contextmanager
   def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:

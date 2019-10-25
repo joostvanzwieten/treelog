@@ -234,15 +234,6 @@ class HtmlLog(Log):
         pass
       self.assertTrue(os.path.exists(os.path.join(tmpdir, 'log-2.html')))
 
-  def test_deprecated_write_level_int(self):
-    with tempfile.TemporaryDirectory() as tmpdir:
-      with treelog.HtmlLog(tmpdir, title='test') as htmllog:
-        with self.assertWarns(DeprecationWarning):
-          htmllog.write('test', 1)
-      with open(os.path.join(tmpdir, 'log.html'), 'r') as f:
-        lines = f.readlines()
-      self.assertIn('<div class="item" data-loglevel="1">test</div>\n', lines)
-
 class RecordLog(Log):
 
   @contextlib.contextmanager
@@ -470,17 +461,6 @@ class FilterLog(Log):
       ('open', 2, 'same.dat', 'wb', treelog.proto.Level.error),
       ('close', 2, b'test3'),
       ('write', 'warn', treelog.proto.Level.warning)])
-
-  def test_deprecated_minlevel_int(self):
-    recordlog = treelog.RecordLog()
-    with self.assertWarns(DeprecationWarning):
-      filterlog = treelog.FilterLog(recordlog, minlevel=2)
-    with treelog.set(filterlog):
-      treelog.info('a')
-      treelog.user('b')
-    self.assertEqual(recordlog._messages, [
-      ('write', 'b', treelog.proto.Level.user)
-    ])
 
 class LoggingLog(Log):
 
