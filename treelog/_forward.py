@@ -72,11 +72,7 @@ class FilterLog:
 
   def __init__(self, baselog: proto.Log, minlevel: typing.Union[proto.Level, int]) -> None:
     self._baselog = baselog
-    if isinstance(minlevel, int):
-      warnings.warn('minlevel of type "int" is deprecated, use "proto.Level" instead', DeprecationWarning)
-      self._minlevel = tuple(proto.Level)[minlevel] # type: proto.Level
-    else:
-      self._minlevel = minlevel
+    self._minlevel = minlevel
 
   def pushcontext(self, title: str) -> None:
     self._baselog.pushcontext(title)
