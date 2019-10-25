@@ -67,15 +67,20 @@ class RecordLog:
   '''Record log messages.
 
   The recorded messages can be replayed to the logs that are currently active
-  by :meth:`replay`. Typical usage is caching expensive operations::
+  by :meth:`replay`. Typical usage is caching expensive operations:
 
-      # compute
-      with RecordLog() as record:
-        result = compute_something_expensive()
-      raw = pickle.dumps((record, result))
-      # reuse
-      record, result = pickle.loads(raw)
-      record.replay()
+  >>> import treelog, pickle
+  >>> # compute
+  >>> record = treelog.RecordLog()
+  >>> with treelog.add(record):
+  ...   treelog.info('computing something expensive')
+  ...   result = 'my expensive result'
+  computing something expensive
+  >>> raw = pickle.dumps((record, result))
+  >>> # reuse
+  >>> record, result = pickle.loads(raw)
+  >>> record.replay()
+  computing something expensive
 
   .. Note::
      Exceptions raised while in a :meth:`Log.context` are not recorded.

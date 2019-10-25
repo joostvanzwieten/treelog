@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io, warnings, gc
+import treelog, unittest, contextlib, tempfile, os, sys, hashlib, io, warnings, gc, doctest
 
 class Log(unittest.TestCase):
 
@@ -653,6 +653,11 @@ class Iter(unittest.TestCase):
       ('recontext', "value='c'"),
       ('write', 'hi', treelog.proto.Level.info),
       ('popcontext',))
+
+class DocTest(unittest.TestCase):
+
+  def test_docs(self):
+    doctest.testmod(treelog)
 
 del Log # hide from unittest discovery
 
