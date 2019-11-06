@@ -554,7 +554,7 @@ const Theater = class {
     this.root.style.gridTemplateRows = Array(optimal_nrows).fill('1fr').join(' ');
   }
   _focus_plot(ev) {
-    this.href = ev.currentTarget.src;
+    this.anchor = document.getElementById(ev.currentTarget.dataset.plot_id);
     this.overview = false;
     ev.preventDefault();
     ev.stopPropagation();
