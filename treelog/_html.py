@@ -343,12 +343,12 @@ const Log = class {
         context.classList.remove('collapsed');
       update_state();
     }
-    else if (ev.key == '+' || ev.key == '=') { // Increase loglevel.
-      this.loglevel = this.loglevel+1;
+    else if (ev.key == '+' || ev.key == '=') { // Increase verbosity = decrease loglevel.
+      this.loglevel = this.loglevel-1;
       update_state();
     }
-    else if (ev.key == '-') { // Decrease loglevel.
-      this.loglevel = this.loglevel-1;
+    else if (ev.key == '-') { // Decrease verbosity = increase loglevel.
+      this.loglevel = this.loglevel+1;
       update_state();
     }
     else
