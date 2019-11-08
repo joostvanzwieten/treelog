@@ -69,7 +69,8 @@ def context(title: str, *initargs: typing.Any, **initkwargs: typing.Any) -> typi
 
   log = current
   if initargs or initkwargs:
-    reformat = lambda *args, **kwargs: log.recontext(title.format(*args, **kwargs)) # type: typing.Optional[typing.Callable[..., None]]
+    format = title.format
+    reformat = lambda *args, **kwargs: log.recontext(format(*args, **kwargs)) # type: typing.Optional[typing.Callable[..., None]]
     title = title.format(*initargs, **initkwargs)
   else:
     reformat = None
