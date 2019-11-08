@@ -24,4 +24,5 @@ setup(
   license = 'MIT',
   python_requires = '>=3.5',
   install_requires = ['typing_extensions'],
+  extras_require = dict(docs=['Sphinx>=1.6']),
 )
