@@ -343,12 +343,12 @@ const Log = class {
         context.classList.remove('collapsed');
       update_state();
     }
-    else if (ev.key == '+' || ev.key == '=') { // Increase loglevel.
-      this.loglevel = this.loglevel+1;
+    else if (ev.key == '+' || ev.key == '=') { // Increase verbosity = decrease loglevel.
+      this.loglevel = this.loglevel-1;
       update_state();
     }
-    else if (ev.key == '-') { // Decrease loglevel.
-      this.loglevel = this.loglevel-1;
+    else if (ev.key == '-') { // Decrease verbosity = increase loglevel.
+      this.loglevel = this.loglevel+1;
       update_state();
     }
     else
@@ -554,7 +554,7 @@ const Theater = class {
     this.root.style.gridTemplateRows = Array(optimal_nrows).fill('1fr').join(' ');
   }
   _focus_plot(ev) {
-    this.href = ev.currentTarget.src;
+    this.anchor = document.getElementById(ev.currentTarget.dataset.plot_id);
     this.overview = false;
     ev.preventDefault();
     ev.stopPropagation();
