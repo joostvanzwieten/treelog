@@ -50,6 +50,10 @@ class Log(unittest.TestCase):
         treelog.info('generating')
         f.write(b'test2')
     self.generate_test()
+    with treelog.context('context step={}', 0) as format:
+      treelog.info('foo')
+      format(1)
+      treelog.info('bar')
     with treelog.errorfile('same.dat', 'wb') as f:
       f.write(b'test3')
     with treelog.debugfile('dbg.dat', 'wb') as f:
@@ -78,6 +82,8 @@ class StdoutLog(Log):
       'my context > generating\n'
       'my context > test.dat\n'
       'generate_test > test.dat\n'
+      'context step=0 > foo\n'
+      'context step=1 > bar\n'
       'same.dat\n'
       'dbg.dat\n'
       'dbg\n'
@@ -109,6 +115,13 @@ class RichOutputLog(Log):
       '\r\x1b[K'
       'generate_test > '
       '\x1b[1;35mtest.dat\x1b[0m\ngenerate_test > '
+      '\r\x1b[K'
+      'context step=0 > '
+      '\x1b[1mfoo\x1b[0m\n'
+      'context step=0 > '
+      '\x1b[4D1 > '
+      '\x1b[1mbar\x1b[0m\n'
+      'context step=1 > '
       '\r\x1b[K'
       '\x1b[1;31msame.dat\x1b[0m\n'
       '\x1b[1;30mdbg.dat\x1b[0m\n'
@@ -193,6 +206,14 @@ class HtmlLog(Log):
         '<div class="context"><div class="title">generate_test</div><div class="children">\n',
         '<div class="item" data-loglevel="3"><a href="3ebfa301dc59196f18593c45e519287a23297589.dat" download="test.dat">test.dat</a></div>\n',
         '</div><div class="end"></div></div>\n',
+        '<div class="context"><div class="title">context step=0</div><div '
+        'class="children">\n',
+        '<div class="item" data-loglevel="1">foo</div>\n',
+        '</div><div class="end"></div></div>\n',
+        '<div class="context"><div class="title">context step=1</div><div '
+        'class="children">\n',
+        '<div class="item" data-loglevel="1">bar</div>\n',
+        '</div><div class="end"></div></div>\n',
         '<div class="item" data-loglevel="4"><a href="3ebfa301dc59196f18593c45e519287a23297589.dat" download="same.dat">same.dat</a></div>\n',
         '<div class="item" data-loglevel="0"><a href="1ff2b3704aede04eecb51e50ca698efd50a1379b.dat" download="dbg.dat">dbg.dat</a></div>\n',
         '<div class="item" data-loglevel="0">dbg</div>\n',
@@ -264,6 +285,11 @@ class RecordLog(Log):
       ('open', 2, 'test.dat', 'wb', treelog.proto.Level.warning),
       ('close', 2, b'test3'),
       ('popcontext',),
+      ('pushcontext', 'context step=0'),
+      ('write', 'foo', treelog.proto.Level.info),
+      ('recontext', 'context step=1'),
+      ('write', 'bar', treelog.proto.Level.info),
+      ('popcontext',),
       ('open', 3, 'same.dat', 'wb', treelog.proto.Level.error),
       ('close', 3, b'test3'),
       ('open', 4, 'dbg.dat', 'wb', treelog.proto.Level.debug),
@@ -305,6 +331,10 @@ class SimplifiedRecordLog(Log):
       ('recontext', 'generate_test'),
       ('open', 2, 'test.dat', 'wb', treelog.proto.Level.warning),
       ('close', 2, b'test3'),
+      ('recontext', 'context step=0'),
+      ('write', 'foo', treelog.proto.Level.info),
+      ('recontext', 'context step=1'),
+      ('write', 'bar', treelog.proto.Level.info),
       ('popcontext',),
       ('open', 3, 'same.dat', 'wb', treelog.proto.Level.error),
       ('close', 3, b'test3'),
@@ -478,6 +508,8 @@ class LoggingLog(Log):
       'INFO:nutils:my context > generating',
       'Level 25:nutils:my context > test.dat',
       'WARNING:nutils:generate_test > test.dat',
+      'INFO:nutils:context step=0 > foo',
+      'INFO:nutils:context step=1 > bar',
       'ERROR:nutils:same.dat',
       'WARNING:nutils:warn'])
 
