@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-version = '1.0b6'
+version = '1.0b7'
 
 import sys, functools, contextlib, typing, typing_extensions
 
