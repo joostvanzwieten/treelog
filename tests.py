@@ -392,7 +392,7 @@ class TeeLog(Log):
   def test_open_devnull_devnull(self):
     teelog = treelog.TeeLog(treelog.StdoutLog(), treelog.StdoutLog())
     with silent(), teelog.open('test', 'wb', level=treelog.proto.Level.info) as f:
-      self.assertFalse(f)
+      self.assertEqual(f.name, os.devnull)
 
   def test_open_devnull_rw(self):
     with tempfile.TemporaryDirectory() as tmpdir:

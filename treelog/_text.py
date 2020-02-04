@@ -56,7 +56,8 @@ class ContextLog:
 
   @contextlib.contextmanager
   def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
-    yield _io.devnull()
+    with _io.devnull(mode) as f:
+      yield f
     self.write(filename, level=level)
 
 class StdoutLog(ContextLog):

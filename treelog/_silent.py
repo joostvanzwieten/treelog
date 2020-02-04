@@ -36,7 +36,7 @@ class NullLog:
     pass
 
   def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO[typing.Any]]:
-    return _io.devnull()
+    return _io.devnull(mode)
 
 class DataLog:
   '''Output only data.'''
