@@ -45,7 +45,7 @@ class TeeLog:
     self._baselog2.write(text, level)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[typing.IO[typing.Any], None, None]:
     with self._baselog1.open(filename, mode, level) as f1, self._baselog2.open(filename, mode, level) as f2:
       if f1.name == os.devnull:
         yield f2
@@ -87,7 +87,7 @@ class FilterLog:
     if level.value >= self._minlevel.value:
       self._baselog.write(text, level)
 
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO[typing.Any]]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[typing.IO[typing.Any]]:
     return self._baselog.open(filename, mode, level) if level.value >= self._minlevel.value else _io.devnull(mode)
 
 # vim:sw=2:sts=2:et

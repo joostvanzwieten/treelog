@@ -71,7 +71,7 @@ class HtmlLog:
     print('<div class="item" data-loglevel="{}">{}</div>'.format(level.value, text), file=self._file, flush=True)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[typing.IO[typing.Any], None, None]:
     base, ext = os.path.splitext(filename)
     with self._dir.temp(mode) as f:
       yield f

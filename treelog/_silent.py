@@ -35,7 +35,7 @@ class NullLog:
   def write(self, text: str , level: proto.Level) -> None:
     pass
 
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[proto.IO[typing.Any]]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing_extensions.ContextManager[typing.IO[typing.Any]]:
     return _io.devnull(mode)
 
 class DataLog:
@@ -46,7 +46,7 @@ class DataLog:
     self._dir = _io.directory(dirpath)
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[typing.IO[typing.Any], None, None]:
     with self._dir.temp(mode) as f:
       yield f
       self._dir.linkfirstunused(f, self._names(filename))
@@ -111,7 +111,7 @@ class RecordLog:
       self._messages.append(('popcontext',))
 
   @contextlib.contextmanager
-  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[proto.IO[typing.Any], None, None]:
+  def open(self, filename: str, mode: str, level: proto.Level) -> typing.Generator[typing.IO[typing.Any], None, None]:
     fid = self._fid
     self._fid += 1
     self._messages.append(('open', fid, filename, mode, level))
