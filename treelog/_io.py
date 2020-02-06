@@ -18,45 +18,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import io, os, contextlib, random, functools, typing, types, sys
-from . import proto
+import os, contextlib, random, functools, typing, types, sys
 
 supports_fd = os.supports_dir_fd >= {os.open, os.link, os.unlink}
 
-class devnull:
-  '''File-like data sink.'''
-
-  _fileno = os.open(os.devnull, os.O_WRONLY) # type: typing.ClassVar[int]
-
-  def __bool__(self) -> bool:
-    return False
-
-  def fileno(self) -> int:
-    return self._fileno
-
-  def readable(self) -> bool:
-    return False
-
-  def read(self, n: int = 0) -> typing.Any:
-    raise io.UnsupportedOperation('not readable')
-
-  def writable(self) -> bool:
-    return True
-
-  def write(self, item: typing.AnyStr) -> int:
-    return len(item)
-
-  def seekable(self) -> bool:
-    return False
-
-  def seek(self, *args: typing.Any) -> int:
-    raise io.UnsupportedOperation('not seekable')
-
-  def __enter__(self) -> 'devnull':
-    return self
-
-  def __exit__(self, t: typing.Optional[typing.Type[BaseException]], value: typing.Optional[BaseException], traceback: typing.Optional[types.TracebackType]) -> None:
-    pass
+_devnull = os.open(os.devnull, os.O_WRONLY)
+_opener = lambda path, flags: os.dup(_devnull)
+devnull = functools.partial(open, os.devnull, opener=_opener)
 
 class directory:
   '''Directory with support for dir_fd.'''
